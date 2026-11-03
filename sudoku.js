@@ -26,12 +26,11 @@
   const difficulty = l => ['入门', '入门', '简单', '简单', '中等', '中等', '困难', '困难', '挑战', '挑战'][Math.min(9, Math.floor((l - 1) / 10))];
 
   function persist() {
-    saved.level = level; saved.unlocked = unlocked; saved.completed = [...completed]; saved.challenge = challenge; saved.best = best;
     store.write({ unlocked, completed: [...completed], level, boards: saved.boards || {}, challenge, best });
   }
   function saveGame() {
     saved.boards = saved.boards || {};
-    saved.boards[level] = { cells: board.slice(), notes: notes.map(s => [...s]), seconds };
+    saved.boards[level] = { cells: board.slice(), notes: notes.map(s => [...s]), seconds, ts: Date.now() };
     persist();
   }
 
@@ -46,7 +45,13 @@
     given = clue.map(x => x > 0);
     const nb = st && st.notes;
     notes = Array.from({ length: 81 }, (_, i) => Array.isArray(nb && nb[i]) ? new Set(nb[i].filter(x => x >= 1 && x <= 9)) : new Set());
-    history = []; selected = -1; seconds = Math.min(1e5, Math.max(0, (st && st.seconds) | 0)); noteMode = false;
+    history = []; selected = -1;
+    seconds = Math.min(1e5, Math.max(0, (st && st.seconds) | 0));
+    if (st && st.ts) {
+      const gap = (Date.now() - st.ts) / 1000;
+      if (gap > 1 && gap < 120) seconds = Math.min(1e5, seconds + Math.floor(gap));
+    }
+    noteMode = false;
     $('notes').classList.remove('active');
     persist(); render(); startTimer();
   }
@@ -54,7 +59,7 @@
   function startTimer() {
     clearInterval(timerId);
     updateTimer();
-    timerId = setInterval(() => { seconds++; updateTimer(); saveGame(); }, 1000);
+    timerId = setInterval(() => { seconds++; updateTimer(); if (seconds % 5 === 0) saveGame(); }, 1000);
   }
   function updateTimer() { $('timer').textContent = fmt(seconds); }
 
@@ -67,33 +72,7 @@
     $('progress-bar').style.width = completed.size + '%';
     $('best').textContent = best[level] ? ('本关最佳 ' + fmt(best[level])) : '';
 
-    const selVal = selected >= 0 ? board[selected] : 0;
-    boardEl.innerHTML = '';
-    for (let i = 0; i < 81; i++) {
-      const b = document.createElement('button'), r = (i / 9) | 0, c = i % 9, v = board[i];
-      b.className = 'cell';
-      b.setAttribute('role', 'gridcell');
-      b.setAttribute('aria-label', `第${r + 1}行第${c + 1}列${v ? '，' + v : ''}`);
-      if (given[i]) b.classList.add('given');
-      if (selected >= 0) {
-        const sr = (selected / 9) | 0, sc = selected % 9;
-        if (i === selected) b.classList.add('selected');
-        else if (r === sr || c === sc || ((r / 3 | 0) === (sr / 3 | 0) && (c / 3 | 0) === (sc / 3 | 0))) b.classList.add('related');
-        if (selVal && v === selVal && i !== selected) b.classList.add('same');
-      }
-      if (v) {
-        b.textContent = v;
-        if (!challenge && !given[i] && v !== solution[i]) b.classList.add('error');
-        if (!challenge && !given[i] && duplicate(i, v)) b.classList.add('conflict');
-      } else if (notes[i] && notes[i].size) {
-        const box = document.createElement('span');
-        box.className = 'notes';
-        for (let d = 1; d <= 9; d++) { const s = document.createElement('span'); s.textContent = notes[i].has(d) ? d : ''; box.append(s); }
-        b.append(box);
-      }
-      b.onclick = () => { selected = i; render(); };
-      boardEl.append(b);
-    }
+    paintBoard();
 
     const nums = $('numbers');
     nums.innerHTML = '';
@@ -105,6 +84,49 @@
       nums.append(btn);
     }
     renderLevels();
+  }
+
+  let cellEls = [];
+  let boardBuilt = false;
+  function buildBoard() {
+    boardEl.innerHTML = '';
+    cellEls = [];
+    for (let i = 0; i < 81; i++) {
+      const b = document.createElement('button');
+      b.className = 'cell';
+      b.setAttribute('role', 'gridcell');
+      b.onclick = () => { selected = i; paintBoard(); };
+      boardEl.append(b);
+      cellEls[i] = b;
+    }
+    boardBuilt = true;
+  }
+  function paintCell(i) {
+    const b = cellEls[i], r = (i / 9) | 0, c = i % 9, v = board[i];
+    b.className = 'cell';
+    b.setAttribute('aria-label', `第${r + 1}行第${c + 1}列${v ? '，' + v : ''}`);
+    if (given[i]) b.classList.add('given');
+    if (selected >= 0) {
+      const sr = (selected / 9) | 0, sc = selected % 9;
+      if (i === selected) b.classList.add('selected');
+      else if (r === sr || c === sc || ((r / 3 | 0) === (sr / 3 | 0) && (c / 3 | 0) === (sc / 3 | 0))) b.classList.add('related');
+      const selVal = board[selected];
+      if (selVal && v === selVal && i !== selected) b.classList.add('same');
+    }
+    b.textContent = v || '';
+    if (!v && notes[i] && notes[i].size) {
+      const box = document.createElement('span');
+      box.className = 'notes';
+      for (let d = 1; d <= 9; d++) { const s = document.createElement('span'); s.textContent = notes[i].has(d) ? d : ''; box.append(s); }
+      b.append(box);
+    } else if (v) {
+      if (!challenge && !given[i] && v !== solution[i]) b.classList.add('error');
+      if (!challenge && !given[i] && duplicate(i, v)) b.classList.add('conflict');
+    }
+  }
+  function paintBoard() {
+    if (!boardBuilt) buildBoard();
+    for (let i = 0; i < 81; i++) paintCell(i);
   }
 
   function duplicate(i, v) {
@@ -169,6 +191,12 @@
       const b = document.createElement('button');
       b.className = 'level' + (i === level ? ' current' : '') + (completed.has(i) ? ' done' : '') + (i > unlocked ? ' locked' : '');
       b.textContent = i;
+      if (best[i]) {
+        const mini = document.createElement('small');
+        mini.className = 'best-mini';
+        mini.textContent = fmt(best[i]);
+        b.append(mini);
+      }
       b.title = `第 ${i} 关 · ${difficulty(i)}${best[i] ? ' · 最佳 ' + fmt(best[i]) : ''}`;
       b.disabled = i > unlocked;
       b.onclick = () => loadLevel(i);
@@ -207,6 +235,7 @@
 
   // 键盘
   document.addEventListener('keydown', e => {
+    if (overlay.classList.contains('show')) { if (e.key === 'Escape') overlay.classList.remove('show'); return; }
     if (e.key >= '1' && e.key <= '9') { enter(+e.key); return; }
     if (e.key === 'Backspace' || e.key === 'Delete') { erase(); return; }
     if (selected >= 0 && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
@@ -219,6 +248,35 @@
       selected = r * 9 + c; render();
     }
   });
+
+  // 页面隐藏/卸载时立即保存（配合节流，避免丢失最后几秒进度）
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(); });
+  window.addEventListener('pagehide', saveGame);
+
+  // 深浅色主题
+  const THEME_KEY = 'quiet-sudoku-theme';
+  const mqDark = window.matchMedia('(prefers-color-scheme: dark)');
+  const themeBtn = $('theme');
+  function applyTheme() {
+    const saved = localStorage.getItem(THEME_KEY);
+    const dark = saved ? saved === 'dark' : mqDark.matches;
+    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.classList.toggle('light', saved === 'light');
+    themeBtn.textContent = dark ? '☀️' : '🌙';
+    themeBtn.setAttribute('aria-pressed', dark);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', dark ? '#1c211d' : '#f5f6f3');
+  }
+  if (themeBtn) {
+    themeBtn.onclick = () => {
+      const cur = localStorage.getItem(THEME_KEY);
+      const next = cur ? (cur === 'dark' ? 'light' : 'dark') : (mqDark.matches ? 'light' : 'dark');
+      localStorage.setItem(THEME_KEY, next);
+      applyTheme();
+    };
+    mqDark.addEventListener('change', () => { if (!localStorage.getItem(THEME_KEY)) applyTheme(); });
+  }
+  applyTheme();
 
   loadLevel(level);
 })();
