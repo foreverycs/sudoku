@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#f5f6f3">
+<title>数独 · 静心一刻</title>
+<link rel="stylesheet" href="sudoku.css">
+</head>
+<body>
+<div class="shell">
+<header class="top"><div class="brand"><div class="mark">▦</div><div><h1>数独</h1><small>静心一刻 · DAILY PUZZLE</small></div></div><div class="top-note">一格一数，慢慢来就好</div></header>
+<main>
+<section class="board-wrap">
+  <div class="heading"><div><div class="eyebrow">SUDOKU · <span id="level-top">01</span> / 100</div><h2 id="title">晨间练习</h2></div><span class="level-label" id="difficulty">入门</span></div>
+  <div class="board" id="board" role="grid" aria-label="数独棋盘"></div>
+  <h3 class="num-head">选择数字</h3>
+  <div class="numbers" id="numbers"></div>
+  <p class="number-hint">也可以使用键盘输入数字，方向键移动格子。</p>
+  <div class="controls"><button class="control" id="undo">↶ 撤销</button><button class="control" id="notes">✎ 笔记</button><button class="control" id="erase">⌫ 擦除</button><button class="control" id="hint">✦ 提示</button></div>
+  <div class="message" id="message"></div>
+</section>
+<aside class="side">
+  <h3>你的进度</h3>
+  <p class="side-intro">一点点练习，也是在前进。</p>
+  <div class="opt-row"><label for="challenge">挑战模式（不提示对错）</label><span class="switch"><input type="checkbox" id="challenge"><i></i></span></div>
+  <div class="stats"><div class="stat"><span>已完成</span><strong><b id="completed">0</b><small style="font-size:12px;color:#899087;font-weight:400"> / 100</small></strong></div><div class="stat"><span>当前用时</span><strong id="timer">00:00</strong></div></div>
+  <div class="best" id="best"></div>
+  <div class="progress-head"><span>闯关进度</span><span id="progress-text">0 / 100</span></div>
+  <div class="progress"><i id="progress-bar" style="width:0"></i></div>
+  <div class="divider"></div>
+  <div class="level-head"><h3>全部关卡</h3><button id="continue">继续当前关 ›</button></div>
+  <div class="levels" id="levels"></div>
+  <div class="foot">你的进度仅保存在此设备的浏览器中。</div>
+</aside>
+</main>
+</div>
+<div class="toast" id="toast"></div>
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="trophy">🏆</div>
+    <h3>恭喜完成本关！</h3>
+    <p class="sub" id="modal-record" style="display:none">🎉 新纪录！</p>
+    <div class="modal-stats">
+      <div><span>本关用时</span><strong id="modal-time">00:00</strong></div>
+      <div><span>最佳成绩</span><strong id="modal-best">--</strong></div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn ghost" id="modal-replay">重玩本关</button>
+      <button class="modal-btn primary" id="modal-next">下一关 ›</button>
+    </div>
+  </div>
+</div>
+<script src="sudoku-data.js"></script>
+<script src="sudoku.js"></script>
+</body>
+</html>
