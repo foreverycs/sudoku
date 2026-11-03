@@ -13,6 +13,7 @@ require_once __DIR__ . '/resp.php';
 require_once __DIR__ . '/handlers/auth.php';
 require_once __DIR__ . '/handlers/progress.php';
 require_once __DIR__ . '/handlers/game.php';
+require_once __DIR__ . '/handlers/admin.php';
 
 // CORS
 header('Access-Control-Allow-Origin: ' . CORS_ORIGIN);
@@ -38,6 +39,16 @@ try {
     if ($method === 'POST' && $r === 'game/complete') return game_complete();
     if ($method === 'GET'  && $r === 'achievements')  return achievements_list();
     if ($method === 'GET'  && $r === 'me/stats')      return me_stats();
+    // 后台管理（阶段五）
+    if ($method === 'GET'  && $r === 'admin/overview')        return admin_overview();
+    if ($method === 'GET'  && $r === 'admin/users')           return admin_users();
+    if ($method === 'GET'  && preg_match('#^admin/users/(\d+)$#', $r, $m)) return admin_user_detail((int)$m[1]);
+    if ($method === 'POST' && preg_match('#^admin/users/(\d+)/status$#', $r, $m)) return admin_user_status((int)$m[1]);
+    if ($method === 'POST' && preg_match('#^admin/users/(\d+)/role$#', $r, $m)) return admin_user_role((int)$m[1]);
+    if ($method === 'POST' && preg_match('#^admin/users/(\d+)/reset$#', $r, $m)) return admin_user_reset((int)$m[1]);
+    if ($method === 'GET'  && $r === 'admin/achievements')    return admin_achievements();
+    if ($method === 'POST' && preg_match('#^admin/achievements/(\d+)/toggle$#', $r, $m)) return admin_achievement_toggle((int)$m[1]);
+    if ($method === 'GET'  && $r === 'admin/logs')            return admin_logs();
     fail('接口不存在', 404);
 } catch (Exception $e) {
     fail('服务器错误：' . $e->getMessage(), 500);

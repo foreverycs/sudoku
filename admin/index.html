@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数独·静心一刻 · 管理后台</title>
+<style>
+:root{
+  --bg:#f5f6f3; --card:#fff; --ink:#20251f; --muted:#7a8073;
+  --line:#e3e7df; --green:#2f5f49; --green-2:#3d7a5c; --gold:#b98a2f;
+  --red:#c0392b; --track:#ecefe9; --pale:#eef4ee; --hover:#f2f5f0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.6 Inter,"PingFang SC","Microsoft YaHei",sans-serif}
+a{color:var(--green)}
+.hidden{display:none!important}
+/* ===== 登录页 ===== */
+.login-wrap{min-height:100vh;display:grid;place-items:center;padding:20px}
+.login-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 10px 40px rgba(0,0,0,.06)}
+.login-card h1{font-size:22px;font-weight:700;margin-bottom:4px}
+.login-card .sub{color:var(--muted);font-size:13px;margin-bottom:24px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+.field input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;font-size:14px;outline:none;transition:.15s}
+.field input:focus{border-color:var(--green)}
+.btn{display:inline-block;border:0;border-radius:9px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+.btn-primary{background:var(--green);color:#fff;width:100%}
+.btn-primary:hover{background:var(--green-2)}
+.btn-ghost{background:var(--pale);color:var(--green)}
+.btn-ghost:hover{background:#e2ece2}
+.btn-danger{background:#fbeae8;color:var(--red)}
+.btn-danger:hover{background:#f6d9d5}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:7px}
+.msg{min-height:20px;font-size:12px;color:var(--red);text-align:center;margin-top:10px}
+/* ===== 后台框架 ===== */
+.admin{display:flex;min-height:100vh}
+.sidebar{width:200px;background:var(--card);border-right:1px solid var(--line);padding:20px 0;position:sticky;top:0;height:100vh;flex-shrink:0}
+.sidebar .logo{padding:0 20px 18px;font-weight:700;font-size:16px;border-bottom:1px solid var(--line)}
+.sidebar .logo small{display:block;font-weight:400;color:var(--muted);font-size:11px;margin-top:2px}
+.nav{list-style:none;padding:12px 10px}
+.nav li{margin-bottom:2px}
+.nav button{width:100%;text-align:left;background:none;border:0;padding:10px 14px;border-radius:8px;font-size:14px;color:var(--muted);cursor:pointer;transition:.15s}
+.nav button:hover{background:var(--hover);color:var(--ink)}
+.nav button.active{background:var(--pale);color:var(--green);font-weight:600}
+.main{flex:1;padding:28px 32px;max-width:1100px}
+.main h2{font-size:20px;font-weight:700;margin-bottom:4px}
+.main .desc{color:var(--muted);font-size:13px;margin-bottom:22px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
+.topbar .who{font-size:13px;color:var(--muted)}
+/* 卡片 */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
+.stat .num{font-size:26px;font-weight:700;color:var(--green)}
+.stat .lab{font-size:12px;color:var(--muted);margin-top:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px}
+.card h3{font-size:15px;font-weight:650;margin-bottom:14px}
+/* 表格 */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:500;font-size:12px}
+tr:hover td{background:var(--hover)}
+.badge{display:inline-block;border-radius:10px;padding:2px 9px;font-size:11px;font-weight:600}
+.badge-ok{background:var(--pale);color:var(--green)}
+.badge-off{background:#fbeae8;color:var(--red)}
+.badge-admin{background:#fdf2df;color:var(--gold)}
+.actions{display:flex;gap:6px}
+/* 工具条 */
+.toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.toolbar input,.toolbar select{padding:8px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;outline:none}
+.toolbar input:focus,.toolbar select:focus{border-color:var(--green)}
+.pager{display:flex;gap:8px;align-items:center;margin-top:14px;font-size:13px;color:var(--muted)}
+.pager button{padding:5px 12px;border:1px solid var(--line);background:var(--card);border-radius:7px;cursor:pointer;font-size:13px}
+.pager button:disabled{opacity:.4;cursor:default}
+.loading{color:var(--muted);text-align:center;padding:30px;font-size:13px}
+.daily{display:flex;align-items:flex-end;gap:10px;height:120px;padding:10px 0}
+.daily .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
+.daily .bar{width:100%;max-width:38px;background:var(--green);border-radius:6px 6px 0 0;min-height:3px;transition:.3s}
+.daily .bar-l{font-size:11px;color:var(--muted)}
+.daily .bar-v{font-size:11px;color:var(--green);font-weight:600}
+</style>
+</head>
+<body>
+<!-- 登录页 -->
+<div class="login-wrap" id="login-page">
+  <div class="login-card">
+    <h1>管理后台</h1>
+    <p class="sub">数独·静心一刻 · 请使用管理员账号登录</p>
+    <form id="login-form">
+      <div class="field"><label>用户名</label><input id="username" autocomplete="username" required></div>
+      <div class="field"><label>密码</label><input id="password" type="password" autocomplete="current-password" required></div>
+      <button class="btn btn-primary" type="submit">登 录</button>
+      <div class="msg" id="login-msg"></div>
+    </form>
+  </div>
+</div>
+
+<!-- 后台框架 -->
+<div class="admin hidden" id="admin-page">
+  <aside class="sidebar">
+    <div class="logo">管理后台<small>数独·静心一刻</small></div>
+    <ul class="nav" id="nav">
+      <li><button data-tab="overview" class="active">📊 数据概览</button></li>
+      <li><button data-tab="users">👤 用户管理</button></li>
+      <li><button data-tab="achievements">🏆 勋章管理</button></li>
+      <li><button data-tab="logs">📅 登录日志</button></li>
+      <li><button id="logout">↩ 退出登录</button></li>
+    </ul>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h2 id="page-title">数据概览</h2>
+        <p class="desc" id="page-desc">站点运营数据一览</p>
+      </div>
+      <div class="who" id="who"></div>
+    </div>
+    <div id="content"></div>
+  </main>
+</div>
+
+<script src="admin.js?v=2"></script>
+</body>
+</html>
