@@ -276,8 +276,11 @@
   const THEME_KEY = 'quiet-sudoku-theme';
   const mqDark = window.matchMedia('(prefers-color-scheme: dark)');
   const themeBtn = $('theme');
+  // 移动端部分浏览器（iOS 隐私模式/WebView）localStorage 可能抛错，须隔离，避免中断主题切换
+  const themeGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
+  const themeSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* 仅不持久化，本次仍可切换 */ } };
   function applyTheme() {
-    const saved = localStorage.getItem(THEME_KEY);
+    const saved = themeGet(THEME_KEY);
     const dark = saved ? saved === 'dark' : mqDark.matches;
     document.documentElement.classList.toggle('dark', dark);
     document.documentElement.classList.toggle('light', saved === 'light');
@@ -290,12 +293,14 @@
   }
   if (themeBtn) {
     themeBtn.onclick = () => {
-      const cur = localStorage.getItem(THEME_KEY);
+      const cur = themeGet(THEME_KEY);
       const next = cur ? (cur === 'dark' ? 'light' : 'dark') : (mqDark.matches ? 'light' : 'dark');
-      localStorage.setItem(THEME_KEY, next);
+      themeSet(THEME_KEY, next);
       applyTheme();
     };
-    mqDark.addEventListener('change', () => { if (!localStorage.getItem(THEME_KEY)) applyTheme(); });
+    const onSchemeChange = () => { if (!themeGet(THEME_KEY)) applyTheme(); };
+    if (mqDark.addEventListener) mqDark.addEventListener('change', onSchemeChange);
+    else if (mqDark.addListener) mqDark.addListener(onSchemeChange); // 旧 iOS Safari 兼容
   }
   applyTheme();
 
