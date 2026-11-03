@@ -16,7 +16,7 @@
   let best = (saved.best && typeof saved.best === 'object') ? saved.best : {};
   let challenge = !!saved.challenge;
 
-  let board = [], given = [], notes = [], selected = -1, noteMode = false, history = [], seconds = 0, timerId = null, sayTimer = null;
+  let board = [], given = [], notes = [], selected = -1, noteMode = false, history = [], seconds = 0, timerId = null, sayTimer = null, playAcc = 0, playStart = 0;
   let solution = [];
 
   const $ = id => document.getElementById(id);
@@ -47,10 +47,6 @@
     notes = Array.from({ length: 81 }, (_, i) => Array.isArray(nb && nb[i]) ? new Set(nb[i].filter(x => x >= 1 && x <= 9)) : new Set());
     history = []; selected = -1;
     seconds = Math.min(1e5, Math.max(0, (st && st.seconds) | 0));
-    if (st && st.ts) {
-      const gap = (Date.now() - st.ts) / 1000;
-      if (gap > 1 && gap < 120) seconds = Math.min(1e5, seconds + Math.floor(gap));
-    }
     noteMode = false;
     $('notes').classList.remove('active');
     persist(); render(); startTimer();
@@ -58,10 +54,26 @@
 
   function startTimer() {
     clearInterval(timerId);
+    playAcc = seconds * 1000;
+    playStart = Date.now();
     updateTimer();
-    timerId = setInterval(() => { seconds++; updateTimer(); if (seconds % 5 === 0) saveGame(); }, 1000);
+    timerId = setInterval(() => { updateTimer(); if (seconds > 0 && seconds % 5 === 0) saveGame(); }, 1000);
   }
-  function updateTimer() { $('timer').textContent = fmt(seconds); }
+  function updateTimer() {
+    seconds = Math.min(1e5, Math.floor((playAcc + (playStart ? Date.now() - playStart : 0)) / 1000));
+    $('timer').textContent = fmt(seconds);
+  }
+  function pauseTimer() {
+    if (!timerId || !playStart) return;
+    playAcc += Date.now() - playStart;
+    playStart = 0;
+    updateTimer();
+  }
+  function resumeTimer() {
+    if (!timerId || playStart) return;
+    playStart = Date.now();
+    updateTimer();
+  }
 
   function render() {
     $('level-top').textContent = String(level).padStart(2, '0');
@@ -173,12 +185,13 @@
   }
 
   function win() {
+    updateTimer();
     completed.add(level);
     unlocked = Math.max(unlocked, Math.min(N, level + 1));
     const t = seconds, prev = best[level], isRecord = !prev || t < prev;
     if (isRecord) best[level] = t;
     saveGame();
-    clearInterval(timerId);
+    clearInterval(timerId); timerId = null;
     $('modal-time').textContent = fmt(t);
     $('modal-best').textContent = isRecord ? '新纪录！' : fmt(prev);
     $('modal-record').style.display = isRecord ? 'inline-block' : 'none';
@@ -268,8 +281,11 @@
     }
   });
 
-  // 页面隐藏/卸载时立即保存（配合节流，避免丢失最后几秒进度）
-  document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(); });
+  // 页面隐藏/卸载：暂停计时并保存；页面可见：恢复计时
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { pauseTimer(); saveGame(); }
+    else resumeTimer();
+  });
   window.addEventListener('pagehide', saveGame);
 
   // 深浅色主题
