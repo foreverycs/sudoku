@@ -145,6 +145,21 @@ function admin_user_reset($id) {
     ok(array('id' => (int)$id, 'reset' => true));
 }
 
+/** POST admin/users/{id}/delete：彻底删除用户（含全部进度/记录/勋章，外键级联） */
+function admin_user_delete($id) {
+    require_admin();
+    if ((int)$id === 1) fail('不能删除内置管理员');
+    $pdo = db();
+    $st = $pdo->prepare('SELECT role FROM users WHERE id = ?');
+    $st->execute([$id]);
+    $u = $st->fetch();
+    if (!$u) fail('用户不存在', 404);
+    if ($u['role'] === 'admin') fail('不能删除管理员');
+    // 外键 ON DELETE CASCADE 会自动清 game_progress / game_records / user_achievements
+    $pdo->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
+    ok(array('id' => (int)$id, 'deleted' => true));
+}
+
 /** GET admin/achievements：勋章管理列表（含各勋章解锁人数） */
 function admin_achievements() {
     require_admin();

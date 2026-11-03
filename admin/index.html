@@ -118,6 +118,18 @@ tr:hover td{background:var(--hover)}
   </main>
 </div>
 
-<script src="admin.js?v=2"></script>
+<!-- 删除确认弹窗 -->
+<div id="confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;place-items:center">
+  <div style="background:var(--card);border-radius:14px;padding:24px;width:340px;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+    <h3 style="font-size:16px;margin-bottom:10px">⚠️ 确认删除用户</h3>
+    <p id="confirm-text" style="font-size:13px;color:var(--muted);margin-bottom:18px"></p>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" id="confirm-cancel">取消</button>
+      <button class="btn btn-danger" id="confirm-ok">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js?v=4"></script>
 </body>
 </html>

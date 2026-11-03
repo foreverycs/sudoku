@@ -152,7 +152,8 @@ function userActions(u) {
     ? '<button class="btn btn-ghost btn-sm" onclick="adminAction(' + u.id + ',\'role\',\'admin\')">设管理员</button>'
     : '';
   const reset = '<button class="btn btn-ghost btn-sm" onclick="if(confirm(\'确认重置该用户进度？\'))adminAction(' + u.id + ',\'reset\')">重置</button>';
-  return ban + role + reset;
+  const del = '<button class="btn btn-danger btn-sm" onclick="deleteUser(' + u.id + ')">删除</button>';
+  return ban + role + reset + del;
 }
 async function adminAction(id, type, val) {
   try {
@@ -162,6 +163,25 @@ async function adminAction(id, type, val) {
     loadUsers($('#content'));
   } catch (e) { alert('操作失败：' + e.message); }
 }
+let delTarget = null;
+function deleteUser(id) {
+  delTarget = id;
+  $('#confirm-text').textContent = '将永久删除用户 #' + id + ' 及其全部进度、记录与勋章。此操作不可恢复，确认继续？';
+  const m = $('#confirm-modal');
+  m.style.display = 'grid';
+}
+function closeConfirm() { $('#confirm-modal').style.display = 'none'; delTarget = null; }
+$('#confirm-cancel').addEventListener('click', closeConfirm);
+$('#confirm-ok').addEventListener('click', async () => {
+  const id = delTarget;
+  closeConfirm();
+  if (!id) return;
+  try {
+    await api('admin/users/' + id + '/delete', 'POST');
+    alert('用户已删除');
+    loadUsers($('#content'));
+  } catch (e) { alert('删除失败：' + e.message); }
+});
 
 // ===== 勋章管理 =====
 async function loadAchievements(c) {

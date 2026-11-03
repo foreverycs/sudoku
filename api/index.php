@@ -46,6 +46,7 @@ try {
     if ($method === 'POST' && preg_match('#^admin/users/(\d+)/status$#', $r, $m)) return admin_user_status((int)$m[1]);
     if ($method === 'POST' && preg_match('#^admin/users/(\d+)/role$#', $r, $m)) return admin_user_role((int)$m[1]);
     if ($method === 'POST' && preg_match('#^admin/users/(\d+)/reset$#', $r, $m)) return admin_user_reset((int)$m[1]);
+    if ($method === 'POST' && preg_match('#^admin/users/(\d+)/delete$#', $r, $m)) return admin_user_delete((int)$m[1]);
     if ($method === 'GET'  && $r === 'admin/achievements')    return admin_achievements();
     if ($method === 'POST' && preg_match('#^admin/achievements/(\d+)/toggle$#', $r, $m)) return admin_achievement_toggle((int)$m[1]);
     if ($method === 'GET'  && $r === 'admin/logs')            return admin_logs();
