@@ -74,20 +74,13 @@
 
     paintBoard();
 
-    const nums = $('numbers');
-    nums.innerHTML = '';
-    for (let d = 1; d <= 9; d++) {
-      const btn = document.createElement('button');
-      btn.className = 'num'; btn.textContent = d;
-      btn.disabled = 81 - board.filter(x => x === d).length === 0;
-      btn.onclick = () => enter(d);
-      nums.append(btn);
-    }
+    renderNumbers();
     renderLevels();
   }
 
   let cellEls = [];
   let boardBuilt = false;
+  let numEls = [], levelEls = [];
   function buildBoard() {
     boardEl.innerHTML = '';
     cellEls = [];
@@ -129,6 +122,24 @@
     for (let i = 0; i < 81; i++) paintCell(i);
   }
 
+  function renderNumbers() {
+    const nums = $('numbers');
+    if (!numEls.length) {
+      nums.innerHTML = '';
+      numEls = [];
+      for (let d = 1; d <= 9; d++) {
+        const btn = document.createElement('button');
+        btn.className = 'num'; btn.textContent = d;
+        btn.onclick = () => enter(d);
+        nums.append(btn);
+        numEls[d] = btn;
+      }
+    }
+    for (let d = 1; d <= 9; d++) {
+      numEls[d].disabled = 81 - board.filter(x => x === d).length === 0;
+    }
+  }
+
   function duplicate(i, v) {
     const r = (i / 9) | 0, c = i % 9;
     for (let k = 0; k < 9; k++) if ((k !== c && board[r * 9 + k] === v) || (k !== r && board[k * 9 + c] === v)) return true;
@@ -146,13 +157,10 @@
       board[selected] = d; notes[selected].clear();
       if (board.every((x, i) => x === solution[i])) { win(); return; }
       const left = board.filter(x => !x).length;
-      if (challenge) {
-        say(left === 0 ? '已填满，请检查是否正确' : (d === solution[selected] ? '正确，还剩 ' + left + ' 格' : '已填入 ' + d));
-      } else {
-        if (left === 0) say('已填满，但有错误，请检查标红的格子');
-        else if (d === solution[selected]) say('正确，还剩 ' + left + ' 格');
-        else say('再检查一下这个数字');
-      }
+      const correct = d === solution[selected];
+      if (left === 0) say(challenge ? '已填满，请检查是否正确' : '已填满，但有错误，请检查标红的格子');
+      else if (correct) say('正确，还剩 ' + left + ' 格');
+      else say(challenge ? '已填入 ' + d : '再检查一下这个数字');
     }
     saveGame(); render();
   }
@@ -186,21 +194,32 @@
 
   function renderLevels() {
     const root = $('levels');
-    root.innerHTML = '';
+    if (!levelEls.length) {
+      root.innerHTML = '';
+      levelEls = [];
+      for (let i = 1; i <= N; i++) {
+        const b = document.createElement('button');
+        const num = document.createElement('span');
+        num.className = 'lvl-num';
+        num.textContent = i;
+        b.append(num);
+        b.onclick = () => loadLevel(i);
+        root.append(b);
+        levelEls[i] = b;
+      }
+    }
     for (let i = 1; i <= N; i++) {
-      const b = document.createElement('button');
+      const b = levelEls[i];
       b.className = 'level' + (i === level ? ' current' : '') + (completed.has(i) ? ' done' : '') + (i > unlocked ? ' locked' : '');
-      b.textContent = i;
+      let mini = b.querySelector('.best-mini');
       if (best[i]) {
-        const mini = document.createElement('small');
-        mini.className = 'best-mini';
+        if (!mini) { mini = document.createElement('small'); mini.className = 'best-mini'; b.append(mini); }
         mini.textContent = fmt(best[i]);
-        b.append(mini);
+      } else if (mini) {
+        mini.remove();
       }
       b.title = `第 ${i} 关 · ${difficulty(i)}${best[i] ? ' · 最佳 ' + fmt(best[i]) : ''}`;
       b.disabled = i > unlocked;
-      b.onclick = () => loadLevel(i);
-      root.append(b);
     }
   }
 
@@ -262,8 +281,10 @@
     const dark = saved ? saved === 'dark' : mqDark.matches;
     document.documentElement.classList.toggle('dark', dark);
     document.documentElement.classList.toggle('light', saved === 'light');
-    themeBtn.textContent = dark ? '☀️' : '🌙';
-    themeBtn.setAttribute('aria-pressed', dark);
+    if (themeBtn) {
+      themeBtn.textContent = dark ? '☀️' : '🌙';
+      themeBtn.setAttribute('aria-pressed', dark);
+    }
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', dark ? '#1c211d' : '#f5f6f3');
   }

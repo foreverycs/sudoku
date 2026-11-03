@@ -78,7 +78,7 @@ main{display:grid;grid-template-columns:minmax(330px,540px) 1fr;gap:56px;align-i
 .controls{display:flex;gap:9px;justify-content:center;margin-top:18px}
 .control{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:10px 13px;color:var(--ctrl-ink);cursor:pointer;font-size:12px;transition:.15s}
 .control:hover{border-color:var(--hover-border);color:var(--green)}
-.control.active{background:var(--pale);color:var(--green);border-color:#c6d7c8}
+.control.active{background:var(--pale);color:var(--green);border-color:var(--hover-border)}
 
 /* ===== 侧边栏 ===== */
 .side{padding-top:15px}
@@ -96,6 +96,7 @@ main{display:grid;grid-template-columns:minmax(330px,540px) 1fr;gap:56px;align-i
 .level-head button{border:0;background:none;color:var(--green);font-size:11px;cursor:pointer}
 .levels{display:grid;grid-template-columns:repeat(10,1fr);gap:5px;max-height:175px;overflow:auto;padding:1px}
 .level{border:1px solid transparent;background:var(--card);border-radius:6px;height:28px;color:var(--level-ink);font-size:10px;cursor:pointer;position:relative;display:grid;place-items:center}
+.level .lvl-num{line-height:1;pointer-events:none}
 .level .best-mini{position:absolute;bottom:1px;left:0;right:0;font-size:7px;line-height:1;color:var(--gold);text-align:center;pointer-events:none}
 .level.current{background:var(--green);color:#fff}
 .level.current .best-mini{color:#fff;opacity:.8}
