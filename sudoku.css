@@ -169,3 +169,36 @@ main{display:grid;grid-template-columns:minmax(330px,540px) 1fr;gap:56px;align-i
   .cell:active{background:var(--rel-bg)}
   .num:active{background:var(--pale)}
 }
+
+/* ===== 账号：登录入口 / 用户菜单（阶段二） ===== */
+.user-area{position:relative;display:inline-flex;align-items:center}
+.login-btn{border:1px solid var(--line);background:var(--card);color:var(--green);border-radius:20px;padding:8px 14px;font-size:12px;cursor:pointer;font-weight:550;transition:.15s;white-space:nowrap}
+.login-btn:hover{border-color:var(--hover-border);background:var(--pale)}
+.user-chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--card);border-radius:20px;padding:4px 11px 4px 4px;font-size:12px;color:var(--ink);cursor:pointer;transition:.15s}
+.user-chip:hover{border-color:var(--hover-border)}
+.avatar{width:24px;height:24px;border-radius:50%;background:var(--green);color:var(--card);display:grid;place-items:center;font-size:12px;font-weight:650;flex:none}
+.uname{max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:550}
+.ucaret{color:var(--muted);font-size:10px}
+.user-menu{position:absolute;top:calc(100% + 8px);right:0;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.12);min-width:190px;padding:8px;z-index:60}
+.um-head{display:flex;flex-direction:column;gap:2px;padding:6px 8px 8px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.um-head strong{font-size:13px;font-weight:650}
+.um-head span{font-size:11px;color:var(--muted)}
+.um-exp{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);padding:4px 8px}
+.um-exp b{color:var(--green);font-size:13px}
+.um-btn{width:100%;border:0;background:none;color:var(--red);font-size:12px;text-align:left;padding:9px 8px;border-radius:8px;cursor:pointer;margin-top:2px}
+.um-btn:hover{background:var(--conflict-bg)}
+
+/* ===== 登录/注册弹窗 ===== */
+.auth-modal{position:relative;max-width:330px;padding:26px 24px 22px}
+.auth-close{position:absolute;top:12px;right:14px;border:0;background:none;color:var(--muted);font-size:15px;cursor:pointer;padding:4px;line-height:1}
+.auth-close:hover{color:var(--ink)}
+.auth-tabs{display:flex;gap:6px;background:var(--ghost-bg);border-radius:11px;padding:4px;margin-bottom:18px}
+.auth-tab{flex:1;border:0;background:none;padding:9px;border-radius:8px;font-size:13px;color:var(--muted);cursor:pointer;font-weight:550;transition:.15s}
+.auth-tab.active{background:var(--card);color:var(--green);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.auth-input{width:100%;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:11px 13px;font-size:14px;margin-bottom:11px;transition:.15s}
+.auth-input:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px var(--pale)}
+.auth-input::placeholder{color:var(--muted)}
+.auth-submit{width:100%;border:0;background:var(--green);color:var(--card);border-radius:10px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;margin-top:2px;transition:.15s}
+.auth-submit:hover{filter:brightness(1.06)}
+.auth-submit:disabled{opacity:.6;cursor:default}
+.auth-msg{min-height:18px;margin:10px 0 0;font-size:12px;color:var(--red);text-align:center;white-space:pre-wrap}

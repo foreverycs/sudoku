@@ -9,7 +9,7 @@
 </head>
 <body>
 <div class="shell">
-<header class="top"><div class="brand"><div class="mark">▦</div><div><h1>数独</h1><small>静心一刻 · DAILY PUZZLE</small></div></div><div class="top-right"><span class="top-note">一格一数，慢慢来就好</span><button class="theme-btn" id="theme" aria-label="切换深浅色主题">🌙</button></div></header>
+<header class="top"><div class="brand"><div class="mark">▦</div><div><h1>数独</h1><small>静心一刻 · DAILY PUZZLE</small></div></div><div class="top-right"><span class="top-note">一格一数，慢慢来就好</span><div class="user-area"><button class="login-btn" id="login-btn">登录 / 注册</button><button class="user-chip" id="user-chip" style="display:none"><span class="avatar" id="avatar"></span><span class="uname" id="uname"></span><span class="ucaret">▾</span></button><div class="user-menu" id="user-menu" style="display:none"><div class="um-head"><strong id="um-nick"></strong><span id="um-username"></span></div><div class="um-exp"><span>Lv.<b id="um-level">1</b></span><span id="um-exp-text">0/100</span></div><button class="um-btn" id="logout-btn">退出登录</button></div></div><button class="theme-btn" id="theme" aria-label="切换深浅色主题">🌙</button></div></header>
 <main>
 <section class="board-wrap">
   <div class="heading"><div><div class="eyebrow">SUDOKU · <span id="level-top">01</span> / 100</div><h2 id="title">晨间练习</h2></div><span class="level-label" id="difficulty">入门</span></div>
@@ -31,7 +31,7 @@
   <div class="divider"></div>
   <div class="level-head"><h3>全部关卡</h3><button id="continue">继续当前关 ›</button></div>
   <div class="levels" id="levels"></div>
-  <div class="foot">你的进度仅保存在此设备的浏览器中。</div>
+  <div class="foot" id="foot">你的进度仅保存在此设备的浏览器中。</div>
 </aside>
 </main>
 </div>
@@ -48,6 +48,29 @@
       <button class="modal-btn ghost" id="modal-replay">重玩本关</button>
       <button class="modal-btn primary" id="modal-next">下一关 ›</button>
     </div>
+  </div>
+</div>
+<!-- 登录/注册弹窗 -->
+<div class="overlay" id="auth-overlay">
+  <div class="modal auth-modal">
+    <button class="auth-close" id="auth-close" aria-label="关闭">✕</button>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login" type="button">登录</button>
+      <button class="auth-tab" id="tab-register" type="button">注册</button>
+    </div>
+    <form id="login-form">
+      <input class="auth-input" id="login-username" placeholder="用户名" autocomplete="username">
+      <input class="auth-input" id="login-password" type="password" placeholder="密码" autocomplete="current-password">
+      <button class="auth-submit" type="submit">登 录</button>
+      <p class="auth-msg" id="login-msg"></p>
+    </form>
+    <form id="register-form" style="display:none">
+      <input class="auth-input" id="reg-username" placeholder="用户名（3-32位字母/数字/下划线）" autocomplete="username">
+      <input class="auth-input" id="reg-password" type="password" placeholder="密码（至少6位）" autocomplete="new-password">
+      <input class="auth-input" id="reg-nickname" placeholder="昵称（可选）" autocomplete="nickname">
+      <button class="auth-submit" type="submit">注 册</button>
+      <p class="auth-msg" id="reg-msg"></p>
+    </form>
   </div>
 </div>
 <script src="sudoku-data.js"></script>

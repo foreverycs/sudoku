@@ -22,6 +22,30 @@
   const $ = id => document.getElementById(id);
   const boardEl = $('board');
 
+  // ===== 账号 & 云同步（阶段二） =====
+  const API_BASE = '/api/index.php?r=';
+  const TOKEN_KEY = 'sudoku_token';
+  const tokenGet = () => { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; } };
+  const tokenSet = t => { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* 隐私模式忽略 */ } };
+  let currentUser = null;
+  const cellsToStr = a => a.map(x => x | 0).join('');
+  const notesToObj = n => { const o = {}; for (let i = 0; i < n.length; i++) { const s = n[i]; const arr = (s instanceof Set) ? [...s] : (Array.isArray(s) ? s : []); if (arr.length) o[i] = arr; } return o; };
+  const strToCells = s => String(s || '').split('').map(x => { x = +x; return (x >= 0 && x <= 9) ? x : 0; });
+  const objToNotes = o => { const a = Array.from({ length: 81 }, () => []); if (o && typeof o === 'object') for (const k in o) if (Array.isArray(o[k])) a[k] = o[k].filter(x => x >= 1 && x <= 9); return a; };
+  async function apiCall(route, method, data) {
+    const headers = { 'Content-Type': 'application/json' };
+    const t = tokenGet();
+    if (t) headers.Authorization = 'Bearer ' + t;
+    const opts = { method: method || 'GET', headers };
+    if (data !== undefined && data !== null) opts.body = JSON.stringify(data);
+    const res = await fetch(API_BASE + route, opts);
+    let json = null;
+    try { json = await res.json(); } catch { /* 空响应 */ }
+    if (!json) { const e = new Error('网络异常或服务器无响应'); e.status = 0; throw e; }
+    if (!json.ok) { const e = new Error(json.error || '请求失败'); e.status = res.status; throw e; }
+    return json.data;
+  }
+
   const fmt = s => String((s / 60) | 0).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
   const difficulty = l => ['入门', '入门', '简单', '简单', '中等', '中等', '困难', '困难', '挑战', '挑战'][Math.min(9, Math.floor((l - 1) / 10))];
 
@@ -32,6 +56,7 @@
     saved.boards = saved.boards || {};
     saved.boards[level] = { cells: board.slice(), notes: notes.map(s => [...s]), seconds, ts: Date.now() };
     persist();
+    queuePush();
   }
 
   function loadLevel(l) {
@@ -320,5 +345,167 @@
   }
   applyTheme();
 
+  // ===== 账号 & 云同步：UI 绑定与初始化（阶段二） =====
+  let pushTimer = null;
+  function queuePush() {
+    if (!currentUser) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(() => {
+      if (!currentUser) return;
+      apiCall('progress/' + level, 'PUT', { cells: cellsToStr(board), notes: notesToObj(notes), seconds })
+        .catch(() => { /* 网络波动忽略，下次保存重试 */ });
+    }, 800);
+  }
+
+  function updateUserUI() {
+    const loginBtn = $('login-btn'), chip = $('user-chip'), menu = $('user-menu');
+    if (currentUser) {
+      loginBtn.style.display = 'none';
+      chip.style.display = 'inline-flex';
+      const name = currentUser.nickname || currentUser.username || '?';
+      $('avatar').textContent = name.charAt(0).toUpperCase();
+      $('uname').textContent = name;
+      $('um-nick').textContent = name;
+      $('um-username').textContent = '@' + (currentUser.username || '');
+      $('um-level').textContent = currentUser.level || 1;
+      $('um-exp-text').textContent = (currentUser.exp || 0) + ' / ' + (currentUser.expNext || 100);
+      $('foot').textContent = '已开启云端同步，闯关进度会自动备份到账号。';
+    } else {
+      loginBtn.style.display = '';
+      chip.style.display = 'none';
+      if (menu) menu.style.display = 'none';
+      $('foot').textContent = '你的进度仅保存在此设备的浏览器中。';
+    }
+  }
+
+  function switchAuthTab(tab) {
+    const isLogin = tab === 'login';
+    $('tab-login').classList.toggle('active', isLogin);
+    $('tab-register').classList.toggle('active', !isLogin);
+    $('login-form').style.display = isLogin ? '' : 'none';
+    $('register-form').style.display = isLogin ? 'none' : '';
+    $('login-msg').textContent = ''; $('reg-msg').textContent = '';
+  }
+  function openAuth(tab) {
+    switchAuthTab(tab || 'login');
+    $('auth-overlay').classList.add('show');
+  }
+  function closeAuth() { $('auth-overlay').classList.remove('show'); }
+
+  // 云同步：云端为准拉取，合并本地独有关卡并上传备份
+  async function syncProgress() {
+    if (!currentUser) return;
+    let cloud = {};
+    try { cloud = (await apiCall('progress', 'GET')).progress || {}; } catch { return; }
+    saved.boards = saved.boards || {};
+    let changed = false;
+    Object.keys(cloud).forEach(k => {
+      const lv = +k;
+      if (!lv || lv < 1 || lv > N) return;
+      const c = cloud[lv];
+      saved.boards[lv] = { cells: strToCells(c.cells), notes: objToNotes(c.notes), seconds: (c.seconds | 0), ts: Date.now() };
+      changed = true;
+    });
+    Object.keys(saved.boards).forEach(k => {
+      const lv = +k;
+      if (!lv || lv < 1 || lv > N || cloud[lv]) return;
+      const b = saved.boards[lv];
+      if (!b || !Array.isArray(b.cells)) return;
+      apiCall('progress/' + lv, 'PUT', { cells: cellsToStr(b.cells), notes: notesToObj(b.notes || []), seconds: (b.seconds | 0) }).catch(() => {});
+    });
+    if (changed) persist();
+    return changed;
+  }
+
+  async function initAuth() {
+    if (!tokenGet()) { updateUserUI(); return; }
+    try {
+      const d = await apiCall('auth/me', 'GET');
+      currentUser = d.user;
+      currentUser.expNext = d.expNext || 100;
+      updateUserUI();
+      const changed = await syncProgress();
+      if (changed) loadLevel(level);
+    } catch (err) {
+      if (err.status === 401) tokenSet('');
+      currentUser = null;
+      updateUserUI();
+    }
+  }
+
+  function bindAuth() {
+    $('login-btn').onclick = () => openAuth('login');
+    $('tab-login').onclick = () => switchAuthTab('login');
+    $('tab-register').onclick = () => switchAuthTab('register');
+    $('auth-close').onclick = closeAuth;
+    $('auth-overlay').addEventListener('click', e => { if (e.target === $('auth-overlay')) closeAuth(); });
+
+    $('login-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const username = $('login-username').value.trim();
+      const password = $('login-password').value;
+      const msg = $('login-msg');
+      msg.textContent = '';
+      if (!username || !password) { msg.textContent = '请输入用户名和密码'; return; }
+      const btn = e.target.querySelector('.auth-submit');
+      btn.disabled = true; msg.style.color = 'var(--muted)'; msg.textContent = '登录中…';
+      try {
+        const d = await apiCall('auth/login', 'POST', { username, password });
+        tokenSet(d.token); currentUser = d.user;
+        currentUser.expNext = d.expNext || 100;
+        updateUserUI(); closeAuth();
+        say('欢迎回来，' + (currentUser.nickname || currentUser.username));
+        const changed = await syncProgress();
+        if (changed) loadLevel(level);
+      } catch (err) {
+        msg.style.color = 'var(--red)'; msg.textContent = err.message;
+      } finally { btn.disabled = false; }
+    });
+
+    $('register-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const username = $('reg-username').value.trim();
+      const password = $('reg-password').value;
+      const nickname = $('reg-nickname').value.trim();
+      const msg = $('reg-msg');
+      msg.textContent = '';
+      if (!username || !password) { msg.textContent = '请输入用户名和密码'; return; }
+      const btn = e.target.querySelector('.auth-submit');
+      btn.disabled = true; msg.style.color = 'var(--muted)'; msg.textContent = '注册中…';
+      try {
+        const d = await apiCall('auth/register', 'POST', { username, password, nickname });
+        tokenSet(d.token); currentUser = d.user;
+        currentUser.expNext = d.expNext || 100;
+        updateUserUI(); closeAuth();
+        say('注册成功，欢迎加入！');
+        const changed = await syncProgress();
+        if (changed) loadLevel(level);
+      } catch (err) {
+        msg.style.color = 'var(--red)'; msg.textContent = err.message;
+      } finally { btn.disabled = false; }
+    });
+
+    $('user-chip').onclick = e => {
+      e.stopPropagation();
+      const m = $('user-menu');
+      m.style.display = (m.style.display === 'none' || !m.style.display) ? 'block' : 'none';
+    };
+    document.addEventListener('click', e => {
+      const m = $('user-menu');
+      if (m && m.style.display === 'block' && !m.contains(e.target) && !$('user-chip').contains(e.target)) m.style.display = 'none';
+    });
+    $('logout-btn').onclick = () => {
+      tokenSet(''); currentUser = null;
+      updateUserUI();
+      say('已退出登录，进度将仅保存在本地');
+    };
+    // 弹窗 Escape 关闭
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && $('auth-overlay').classList.contains('show')) closeAuth();
+    });
+  }
+
+  bindAuth();
+  initAuth();
   loadLevel(level);
 })();

@@ -11,6 +11,7 @@
  */
 require_once __DIR__ . '/resp.php';
 require_once __DIR__ . '/handlers/auth.php';
+require_once __DIR__ . '/handlers/progress.php';
 
 // CORS
 header('Access-Control-Allow-Origin: ' . CORS_ORIGIN);
@@ -31,6 +32,8 @@ try {
     if ($method === 'POST' && $r === 'auth/register') return auth_register();
     if ($method === 'POST' && $r === 'auth/login')    return auth_login();
     if ($method === 'GET'  && $r === 'auth/me')       return auth_me();
+    if ($method === 'GET'  && $r === 'progress')      return progress_all();
+    if ($method === 'PUT'  && preg_match('#^progress/(\d{1,3})$#', $r, $m)) return progress_save((int)$m[1]);
     fail('接口不存在', 404);
 } catch (Exception $e) {
     fail('服务器错误：' . $e->getMessage(), 500);
