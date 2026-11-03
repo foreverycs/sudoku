@@ -409,6 +409,34 @@
     } catch (e) { /* 网络忽略 */ }
   }
 
+  // ===== 排行榜（阶段六） =====
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+  async function loadLeaderboard() {
+    const el = $('leader-list');
+    if (!el) return;
+    try {
+      const d = await apiCall('leaderboard', 'GET');
+      const list = d.ranking || [];
+      if (!list.length) { el.innerHTML = '<div class="leader-loading">暂无上榜用户，快去闯关吧</div>'; return; }
+      const uid = currentUser ? currentUser.id : -1;
+      el.innerHTML = list.map((u, i) => {
+        const me = u.id === uid;
+        const ava = u.avatar
+          ? '<img src="' + u.avatar + '" alt="">'
+          : (u.nickname || u.username || '?').charAt(0).toUpperCase();
+        return '<div class="lb-row' + (me ? ' me' : '') + '">'
+          + '<span class="lb-rank">' + (i + 1) + '</span>'
+          + '<span class="lb-ava">' + ava + '</span>'
+          + '<span class="lb-info"><span class="lb-name">' + esc(u.nickname || u.username) + '</span>'
+          + '<span class="lb-meta"><span>🏅' + u.ach_count + '</span><span>✅' + u.done_count + '</span></span></span>'
+          + '<span class="lb-lv">Lv.' + u.level + '</span>'
+          + '</div>';
+      }).join('');
+    } catch (e) {
+      el.innerHTML = '<div class="leader-loading">排行榜加载失败</div>';
+    }
+  }
+
   function renderModalGain(d) {
     const el = $('modal-gain');
     if (!d || !d.expGain) { el.style.display = 'none'; return; }
@@ -617,5 +645,6 @@
 
   bindAuth();
   initAuth();
+  loadLeaderboard();
   loadLevel(level);
 })();

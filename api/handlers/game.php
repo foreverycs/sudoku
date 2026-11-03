@@ -129,3 +129,23 @@ function me_stats() {
     foreach ($st->fetchAll() as $r) $bestByLevel[(int)$r['level']] = (int)$r['best'];
     ok(array('stats' => $stats, 'bestByLevel' => $bestByLevel));
 }
+
+/** GET leaderboard：排行榜（按等级+经验排序，公开，前 N 名） */
+function leaderboard() {
+    $limit = isset($_GET['limit']) ? min(50, max(5, (int)$_GET['limit'])) : 10;
+    $st = db()->query(
+        'SELECT u.id, u.username, u.nickname, u.avatar, u.level, u.exp,'
+        . ' (SELECT COUNT(*) FROM user_achievements ua WHERE ua.user_id = u.id) AS ach_count,'
+        . ' (SELECT COUNT(DISTINCT gr.level) FROM game_records gr WHERE gr.user_id = u.id) AS done_count'
+        . ' FROM users u WHERE u.role = "user" AND u.status = 1'
+        . ' ORDER BY u.level DESC, u.exp DESC, u.id ASC LIMIT ' . $limit
+    );
+    $rows = $st->fetchAll();
+    foreach ($rows as &$r) {
+        $r['level'] = (int)$r['level'];
+        $r['exp'] = (int)$r['exp'];
+        $r['ach_count'] = (int)$r['ach_count'];
+        $r['done_count'] = (int)$r['done_count'];
+    }
+    ok(array('ranking' => $rows, 'count' => count($rows)));
+}
