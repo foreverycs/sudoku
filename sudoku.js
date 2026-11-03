@@ -360,6 +360,8 @@
   const TITLES = ['晨间新手', '轻松起步', '数字漫步', '午后片刻', '静心推理', '思路交汇', '专注时分', '层层深入', '终极挑战', '大师之路'];
   const titleFor = lv => TITLES[Math.min(9, Math.floor(((lv || 1) - 1) / 10))];
   const ACH_ICON = { progress: '🏆', speed: '⚡', persistence: '⏳', challenge: '⛰️', daily: '📅' };
+  const ACH_CODE_ICON = { prog_1: '🏆', prog_10: '🥉', prog_25: '🥈', prog_50: '🥇', prog_100: '💎', speed_60: '⚡', speed_30: '💨', persist_1h: '⏳', persist_10h: '⏰', chal_hard: '⛰️', daily_7: '📅' };
+  const achIcon = a => a.icon || ACH_CODE_ICON[a.code] || ACH_ICON[a.category] || '🎖️';
   let achList = [];
 
   function toast(text) {
@@ -384,6 +386,28 @@
     $('lv-exp').textContent = levelExp + ' / ' + expNext;
   }
 
+  function fmtSec(s) {
+    s = Math.max(0, Math.floor(s || 0));
+    if (s < 60) return s + 's';
+    const m = Math.floor(s / 60), h = Math.floor(m / 60);
+    if (h > 0) return h + 'h' + (m % 60 ? (m % 60) + 'm' : '');
+    return m + 'm';
+  }
+  function achProgText(a) {
+    const p = a.progress || 0, t = a.target || 0;
+    if (a.category === 'progress') return '完成 ' + p + ' / ' + t + ' 关';
+    if (a.category === 'speed') return '最快 ' + (p ? p + 's' : '--') + ' / ' + t + 's';
+    if (a.category === 'persistence') return '累计 ' + fmtSec(p) + ' / ' + fmtSec(t);
+    if (a.category === 'challenge') return '第 ' + p + ' 关 / 第 ' + t + ' 关';
+    if (a.category === 'daily') return '连续 ' + p + ' / ' + t + ' 天';
+    return p + ' / ' + t;
+  }
+  function achProgPct(a) {
+    const p = a.progress || 0, t = a.target || 0;
+    if (!t) return 0;
+    if (a.category === 'speed') return Math.min(100, Math.max(0, Math.round((1 - p / t) * 100)));
+    return Math.min(100, Math.round(p / t * 100));
+  }
   function renderAchievements(list) {
     const head = $('ach-head'), wall = $('ach-wall');
     if (!currentUser || !list || !list.length) { head.style.display = 'none'; wall.style.display = 'none'; return; }
@@ -395,8 +419,15 @@
     list.forEach(a => {
       const b = document.createElement('button');
       b.className = 'ach' + (a.unlocked ? ' unlocked' : '');
+      b.setAttribute('data-cat', a.category || '');
       b.title = a.name + (a.unlocked ? '（已解锁）' : '（未解锁）') + '\n' + a.description + (a.points ? ' · +' + a.points + ' 经验' : '');
-      b.innerHTML = '<span class="ach-icon">' + (a.icon || ACH_ICON[a.category] || '🎖️') + '</span>';
+      const progHtml = a.unlocked
+        ? '<span class="ach-tick">✓</span>'
+        : '<span class="ach-bar"><i style="width:' + achProgPct(a) + '%"></i></span>'
+          + '<span class="ach-prog">' + achProgText(a) + '</span>';
+      b.innerHTML = '<span class="ach-icon">' + achIcon(a) + '</span>'
+        + '<span class="ach-name">' + esc(a.name) + '</span>'
+        + progHtml;
       wall.append(b);
     });
   }
@@ -463,7 +494,7 @@
     if (tags.length) html += '<div class="mg-tags">' + tags.map(t => '<span>' + t + '</span>').join('') + '</div>';
     if (d.newAchievements && d.newAchievements.length) {
       html += '<div class="mg-ach">' + d.newAchievements.map(a =>
-        '<span class="mg-ach-item">' + (a.icon || ACH_ICON[a.category] || '🎖️') + ' ' + a.name + (a.points ? ' +' + a.points : '') + '</span>'
+        '<span class="mg-ach-item">' + achIcon(a) + ' ' + a.name + (a.points ? ' +' + a.points : '') + '</span>'
       ).join('') + '</div>';
     }
     el.innerHTML = html;

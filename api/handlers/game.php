@@ -109,14 +109,30 @@ function game_complete() {
     ));
 }
 
-/** GET achievements：勋章列表 + 用户解锁状态 + 统计 */
+/** GET achievements：勋章列表 + 用户解锁状态 + 统计（含各勋章进度） */
 function achievements_list() {
     $c = current_user();
-    $st = db()->prepare('SELECT a.id, a.code, a.name, a.description, a.icon, a.category, a.points, (ua.id IS NOT NULL) AS unlocked, ua.unlocked_at FROM achievements a LEFT JOIN user_achievements ua ON ua.achievement_id = a.id AND ua.user_id = ? WHERE a.active = 1 ORDER BY a.category, a.cond_value, a.id');
+    $st = db()->prepare('SELECT a.id, a.code, a.name, a.description, a.icon, a.category, a.points, a.cond_type, a.cond_value, (ua.id IS NOT NULL) AS unlocked, ua.unlocked_at FROM achievements a LEFT JOIN user_achievements ua ON ua.achievement_id = a.id AND ua.user_id = ? WHERE a.active = 1 ORDER BY a.category, a.cond_value, a.id');
     $st->execute([$c['uid']]);
     $rows = $st->fetchAll();
-    foreach ($rows as &$r) { $r['unlocked'] = (bool)$r['unlocked']; $r['points'] = (int)$r['points']; }
-    ok(array('achievements' => $rows, 'stats' => user_stats($c['uid'])));
+    $stats = user_stats($c['uid']);
+    foreach ($rows as &$r) {
+        $r['unlocked'] = (bool)$r['unlocked'];
+        $r['points'] = (int)$r['points'];
+        $r['target'] = (int)$r['cond_value'];
+        // 当前进度（按条件类型从统计取值）
+        $pv = 0;
+        switch ($r['cond_type']) {
+            case 'complete_count':   $pv = $stats['complete_count']; break;
+            case 'best_seconds_lt':  $pv = $stats['best_min'];       break;
+            case 'total_seconds_ge': $pv = $stats['total_seconds'];  break;
+            case 'level_ge':         $pv = $stats['max_level'];      break;
+            case 'daily_streak_ge':  $pv = 0;                        break;
+        }
+        $r['progress'] = (int)$pv;
+    }
+    unset($r); // 断开 foreach 引用残留
+    ok(array('achievements' => $rows, 'stats' => $stats));
 }
 
 /** GET me/stats：我的统计（完成数/总时长/最佳各关） */

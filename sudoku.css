@@ -186,7 +186,7 @@ main{display:grid;grid-template-columns:180px minmax(330px,540px) 1fr;gap:40px;a
   .controls{flex-wrap:wrap}
   .numbers{grid-template-columns:repeat(5,minmax(0,1fr))}
   .levels{grid-template-columns:repeat(8,minmax(0,1fr))}
-  .ach-wall{grid-template-columns:repeat(5,1fr)}
+  .ach-wall{grid-template-columns:repeat(3,1fr)}
   .heading h2{font-size:21px}
   .modal{max-width:320px}
 }
@@ -243,12 +243,29 @@ main{display:grid;grid-template-columns:180px minmax(330px,540px) 1fr;gap:40px;a
 .ach-head{display:flex;justify-content:space-between;align-items:center;margin:0 0 10px}
 .ach-head h3{font-size:13px;font-weight:600;margin:0}
 .ach-head span{font-size:11px;color:var(--muted)}
-.ach-wall{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:24px}
-.ach{border:1px solid var(--line);background:var(--card);border-radius:9px;aspect-ratio:1;display:grid;place-items:center;cursor:default;transition:.15s}
-.ach-icon{font-size:19px;filter:grayscale(1);opacity:.32}
-.ach.unlocked{border-color:var(--gold)}
-.ach.unlocked .ach-icon{filter:none;opacity:1}
-.ach:hover{border-color:var(--hover-border)}
+.ach-wall{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:24px}
+.ach{position:relative;border:1px solid var(--line);background:var(--card);border-radius:11px;padding:10px 6px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:default;transition:.18s;overflow:hidden}
+.ach::before{content:'';position:absolute;inset:0;opacity:0;transition:.18s;background:linear-gradient(160deg,rgba(var(--ac,153,153,153),.18) 0%,transparent 62%)}
+.ach:hover{transform:translateY(-2px);border-color:rgb(var(--ac,153,153,153));box-shadow:0 6px 16px rgba(0,0,0,.08)}
+.ach:hover::before{opacity:.16}
+.ach-icon{font-size:22px;filter:grayscale(1) opacity(.38);transition:.18s}
+.ach-name{font-size:9.5px;font-weight:600;color:var(--muted);line-height:1.2;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ach-bar{width:100%;height:3px;background:var(--track);border-radius:3px;overflow:hidden;margin-top:2px}
+.ach-bar i{display:block;height:100%;background:rgb(var(--ac,153,153,153));border-radius:3px;transition:.3s}
+.ach-prog{font-size:9px;color:var(--muted);white-space:nowrap}
+.ach-tick{position:absolute;top:4px;right:5px;width:14px;height:14px;border-radius:50%;background:rgb(var(--ac,74,144,217));color:#fff;font-size:9px;font-weight:700;display:grid;place-items:center;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+/* 分类配色 */
+.ach[data-cat="progress"]{--ac:74,144,217}
+.ach[data-cat="speed"]{--ac:245,166,35}
+.ach[data-cat="persistence"]{--ac:155,89,182}
+.ach[data-cat="challenge"]{--ac:230,126,34}
+.ach[data-cat="daily"]{--ac:39,174,96}
+/* 解锁：彩色 + 发光 + 渐变底 */
+.ach.unlocked{border-color:rgb(var(--ac,153,153,153));background:linear-gradient(165deg,rgba(var(--ac,153,153,153),.14),var(--card) 70%)}
+.ach.unlocked::before{opacity:.18}
+.ach.unlocked .ach-icon{filter:none;opacity:1;transform:scale(1.04)}
+.ach.unlocked .ach-name{color:var(--ink)}
+.ach.unlocked:hover{box-shadow:0 8px 20px rgba(var(--ac,153,153,153),.3)}
 
 /* ===== toast（阶段四） ===== */
 .toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:80;pointer-events:none}
