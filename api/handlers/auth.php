@@ -10,6 +10,24 @@ function exp_needed($level) {
     return 100 + ((int)$level - 1) * 50;
 }
 
+/** 由累计经验推算等级 */
+function calc_level($exp) {
+    $level = 1; $remain = (int)$exp;
+    while (true) {
+        $need = exp_needed($level);
+        if ($remain >= $need) { $remain -= $need; $level++; }
+        else break;
+    }
+    return $level;
+}
+
+/** 当前级内已有经验（用于前端进度条） */
+function level_exp_into($exp, $level) {
+    $cum = 0;
+    for ($i = 1; $i < (int)$level; $i++) $cum += exp_needed($i);
+    return max(0, (int)$exp - $cum);
+}
+
 /** 注册 */
 function auth_register() {
     $b = body();
@@ -25,7 +43,7 @@ function auth_register() {
     $st = $pdo->prepare('INSERT INTO users (username, password_hash, nickname) VALUES (?,?,?)');
     $st->execute([$username, ph_hash($password), $nickname !== '' ? $nickname : $username]);
     $uid = (int)$pdo->lastInsertId();
-    ok(['token' => issue_token($uid, $username, 'user'), 'user' => user_pub($uid), 'expNext' => exp_needed(1)]);
+    ok(['token' => issue_token($uid, $username, 'user'), 'user' => user_pub($uid), 'expNext' => exp_needed(1), 'levelExp' => 0]);
 }
 
 /** 登录 */
@@ -44,6 +62,7 @@ function auth_login() {
         'token'   => issue_token((int)$u['id'], $u['username'], $u['role']),
         'user'    => user_pub((int)$u['id']),
         'expNext' => exp_needed($u['level']),
+        'levelExp' => level_exp_into($u['exp'], $u['level']),
     ]);
 }
 
@@ -54,7 +73,7 @@ function auth_me() {
     $st->execute([$c['uid']]);
     $row = $st->fetch();
     if (!$row) fail('用户不存在', 404);
-    ok(['user' => $row, 'expNext' => exp_needed($row['level'])]);
+    ok(['user' => $row, 'expNext' => exp_needed($row['level']), 'levelExp' => level_exp_into($row['exp'], $row['level'])]);
 }
 
 /** 签发 token */

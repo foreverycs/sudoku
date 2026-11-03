@@ -161,6 +161,7 @@ main{display:grid;grid-template-columns:minmax(330px,540px) 1fr;gap:56px;align-i
   .controls{flex-wrap:wrap}
   .numbers{grid-template-columns:repeat(5,minmax(0,1fr))}
   .levels{grid-template-columns:repeat(8,minmax(0,1fr))}
+  .ach-wall{grid-template-columns:repeat(5,1fr)}
   .heading h2{font-size:21px}
   .modal{max-width:320px}
 }
@@ -202,3 +203,37 @@ main{display:grid;grid-template-columns:minmax(330px,540px) 1fr;gap:56px;align-i
 .auth-submit:hover{filter:brightness(1.06)}
 .auth-submit:disabled{opacity:.6;cursor:default}
 .auth-msg{min-height:18px;margin:10px 0 0;font-size:12px;color:var(--red);text-align:center;white-space:pre-wrap}
+
+/* ===== 等级卡（阶段三） ===== */
+.level-card{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.lc-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.lc-badge{background:var(--green);color:var(--card);border-radius:9px;padding:4px 10px;font-size:12px;font-weight:650}
+.lc-badge b{font-size:15px}
+.lc-title{font-size:13px;font-weight:600;color:var(--ink)}
+.lc-bar{height:6px;background:var(--track);border-radius:6px;overflow:hidden}
+.lc-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--green),var(--gold));border-radius:6px;transition:width .3s}
+.lc-meta{margin-top:6px;font-size:11px;color:var(--muted);text-align:right}
+
+/* ===== 勋章墙（阶段四） ===== */
+.ach-head{display:flex;justify-content:space-between;align-items:center;margin:0 0 10px}
+.ach-head h3{font-size:13px;font-weight:600;margin:0}
+.ach-head span{font-size:11px;color:var(--muted)}
+.ach-wall{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:24px}
+.ach{border:1px solid var(--line);background:var(--card);border-radius:9px;aspect-ratio:1;display:grid;place-items:center;cursor:default;transition:.15s}
+.ach-icon{font-size:19px;filter:grayscale(1);opacity:.32}
+.ach.unlocked{border-color:var(--gold)}
+.ach.unlocked .ach-icon{filter:none;opacity:1}
+.ach:hover{border-color:var(--hover-border)}
+
+/* ===== toast（阶段四） ===== */
+.toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:80;pointer-events:none}
+.toast{background:var(--card);color:var(--ink);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:10px;padding:10px 14px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.14);opacity:0;transform:translateY(8px);transition:.25s;max-width:260px}
+.toast.show{opacity:1;transform:none}
+
+/* ===== 完成弹窗经验/勋章（阶段三/四） ===== */
+.modal-gain{border-top:1px dashed var(--line);margin-top:14px;padding-top:12px}
+.mg-exp{font-size:16px;font-weight:650;color:var(--gold)}
+.mg-tags{display:flex;gap:6px;justify-content:center;margin-top:6px}
+.mg-tags span{font-size:11px;color:var(--green);background:var(--pale);border-radius:12px;padding:3px 9px}
+.mg-ach{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
+.mg-ach-item{font-size:11px;color:var(--ink);background:var(--ghost-bg);border-radius:12px;padding:4px 9px}

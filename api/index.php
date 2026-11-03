@@ -12,6 +12,7 @@
 require_once __DIR__ . '/resp.php';
 require_once __DIR__ . '/handlers/auth.php';
 require_once __DIR__ . '/handlers/progress.php';
+require_once __DIR__ . '/handlers/game.php';
 
 // CORS
 header('Access-Control-Allow-Origin: ' . CORS_ORIGIN);
@@ -34,6 +35,9 @@ try {
     if ($method === 'GET'  && $r === 'auth/me')       return auth_me();
     if ($method === 'GET'  && $r === 'progress')      return progress_all();
     if ($method === 'PUT'  && preg_match('#^progress/(\d{1,3})$#', $r, $m)) return progress_save((int)$m[1]);
+    if ($method === 'POST' && $r === 'game/complete') return game_complete();
+    if ($method === 'GET'  && $r === 'achievements')  return achievements_list();
+    if ($method === 'GET'  && $r === 'me/stats')      return me_stats();
     fail('接口不存在', 404);
 } catch (Exception $e) {
     fail('服务器错误：' . $e->getMessage(), 500);

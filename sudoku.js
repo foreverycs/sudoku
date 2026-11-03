@@ -1,5 +1,11 @@
 (() => {
   'use strict';
+  // ?reset=1 清空本地进度（保留登录 token），用于异常恢复/重新开始
+  if (new URLSearchParams(location.search).has('reset')) {
+    try { localStorage.removeItem('quiet-sudoku'); } catch { /* 忽略 */ }
+    location.replace(location.pathname + '?v=' + Date.now());
+    return;
+  }
   const DATA = window.SUDOKU_DATA || [];
   const N = DATA.length || 100;
   const labels = ['晨间练习', '轻松起步', '数字漫步', '午后片刻', '静心推理', '思路交汇', '专注时分', '层层深入', '终极挑战', '大师之路'];
@@ -220,8 +226,10 @@
     $('modal-time').textContent = fmt(t);
     $('modal-best').textContent = isRecord ? '新纪录！' : fmt(prev);
     $('modal-record').style.display = isRecord ? 'inline-block' : 'none';
+    $('modal-gain').style.display = 'none';
     $('overlay').classList.add('show');
     render();
+    if (currentUser) settleComplete(t);
   }
 
   function say(text) {
@@ -347,6 +355,97 @@
 
   // ===== 账号 & 云同步：UI 绑定与初始化（阶段二） =====
   let pushTimer = null;
+
+  // ===== 等级 & 勋章（阶段三/四） =====
+  const TITLES = ['晨间新手', '轻松起步', '数字漫步', '午后片刻', '静心推理', '思路交汇', '专注时分', '层层深入', '终极挑战', '大师之路'];
+  const titleFor = lv => TITLES[Math.min(9, Math.floor(((lv || 1) - 1) / 10))];
+  const ACH_ICON = { progress: '🏆', speed: '⚡', persistence: '⏳', challenge: '⛰️', daily: '📅' };
+  let achList = [];
+
+  function toast(text) {
+    const box = document.createElement('div');
+    box.className = 'toast';
+    box.textContent = text;
+    $('toasts').append(box);
+    setTimeout(() => box.classList.add('show'), 10);
+    setTimeout(() => { box.classList.remove('show'); setTimeout(() => box.remove(), 300); }, 3200);
+  }
+
+  function renderLevelCard(user) {
+    if (!user) { $('level-card').style.display = 'none'; return; }
+    $('level-card').style.display = '';
+    const lv = user.level || 1;
+    $('lv-num').textContent = lv;
+    $('lv-title').textContent = titleFor(lv);
+    const expNext = user.expNext || 100;
+    const levelExp = (user.levelExp != null) ? user.levelExp : (user.exp || 0);
+    const pct = expNext ? Math.min(100, Math.round(levelExp / expNext * 100)) : 0;
+    $('lv-bar').style.width = pct + '%';
+    $('lv-exp').textContent = levelExp + ' / ' + expNext;
+  }
+
+  function renderAchievements(list) {
+    const head = $('ach-head'), wall = $('ach-wall');
+    if (!currentUser || !list || !list.length) { head.style.display = 'none'; wall.style.display = 'none'; return; }
+    head.style.display = '';
+    wall.style.display = '';
+    const unlockedCount = list.filter(a => a.unlocked).length;
+    $('ach-count').textContent = unlockedCount + ' / ' + list.length;
+    wall.innerHTML = '';
+    list.forEach(a => {
+      const b = document.createElement('button');
+      b.className = 'ach' + (a.unlocked ? ' unlocked' : '');
+      b.title = a.name + (a.unlocked ? '（已解锁）' : '（未解锁）') + '\n' + a.description + (a.points ? ' · +' + a.points + ' 经验' : '');
+      b.innerHTML = '<span class="ach-icon">' + (a.icon || ACH_ICON[a.category] || '🎖️') + '</span>';
+      wall.append(b);
+    });
+  }
+
+  async function loadAchievements() {
+    if (!currentUser) { renderAchievements([]); return; }
+    try {
+      achList = (await apiCall('achievements', 'GET')).achievements || [];
+      renderAchievements(achList);
+    } catch (e) { /* 网络忽略 */ }
+  }
+
+  function renderModalGain(d) {
+    const el = $('modal-gain');
+    if (!d || !d.expGain) { el.style.display = 'none'; return; }
+    let html = '<div class="mg-exp">+' + d.expGain + ' 经验</div>';
+    const tags = [];
+    if (d.first) tags.push('首次完成');
+    if (d.isRecord) tags.push('新纪录');
+    if (tags.length) html += '<div class="mg-tags">' + tags.map(t => '<span>' + t + '</span>').join('') + '</div>';
+    if (d.newAchievements && d.newAchievements.length) {
+      html += '<div class="mg-ach">' + d.newAchievements.map(a =>
+        '<span class="mg-ach-item">' + (a.icon || ACH_ICON[a.category] || '🎖️') + ' ' + a.name + (a.points ? ' +' + a.points : '') + '</span>'
+      ).join('') + '</div>';
+    }
+    el.innerHTML = html;
+    el.style.display = '';
+  }
+
+  async function settleComplete(seconds) {
+    try {
+      const d = await apiCall('game/complete', 'POST', { level, seconds });
+      if (currentUser) {
+        currentUser.exp = d.exp;
+        currentUser.level = d.level;
+        currentUser.expNext = d.expNext;
+        currentUser.levelExp = d.levelExp;
+        updateUserUI();
+        renderLevelCard(currentUser);
+      }
+      renderModalGain(d);
+      if (d.newAchievements && d.newAchievements.length) {
+        d.newAchievements.forEach(a => toast('🏅 解锁勋章：' + a.name));
+      }
+      if (d.levelUp) toast('🎉 升级到 Lv.' + d.level + '！');
+      loadAchievements();
+    } catch (e) { /* 结算失败不影响本地通关 */ }
+  }
+
   function queuePush() {
     if (!currentUser) return;
     clearTimeout(pushTimer);
@@ -375,6 +474,8 @@
       chip.style.display = 'none';
       if (menu) menu.style.display = 'none';
       $('foot').textContent = '你的进度仅保存在此设备的浏览器中。';
+      renderLevelCard(null);
+      renderAchievements([]);
     }
   }
 
@@ -423,7 +524,10 @@
       const d = await apiCall('auth/me', 'GET');
       currentUser = d.user;
       currentUser.expNext = d.expNext || 100;
+      currentUser.levelExp = d.levelExp || 0;
       updateUserUI();
+      renderLevelCard(currentUser);
+      loadAchievements();
       const changed = await syncProgress();
       if (changed) loadLevel(level);
     } catch (err) {
@@ -453,7 +557,10 @@
         const d = await apiCall('auth/login', 'POST', { username, password });
         tokenSet(d.token); currentUser = d.user;
         currentUser.expNext = d.expNext || 100;
+        currentUser.levelExp = d.levelExp || 0;
         updateUserUI(); closeAuth();
+        renderLevelCard(currentUser);
+        loadAchievements();
         say('欢迎回来，' + (currentUser.nickname || currentUser.username));
         const changed = await syncProgress();
         if (changed) loadLevel(level);
@@ -476,7 +583,10 @@
         const d = await apiCall('auth/register', 'POST', { username, password, nickname });
         tokenSet(d.token); currentUser = d.user;
         currentUser.expNext = d.expNext || 100;
+        currentUser.levelExp = d.levelExp || 0;
         updateUserUI(); closeAuth();
+        renderLevelCard(currentUser);
+        loadAchievements();
         say('注册成功，欢迎加入！');
         const changed = await syncProgress();
         if (changed) loadLevel(level);
