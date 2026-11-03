@@ -136,7 +136,7 @@ function renderUsers(c, d) {
     '<td>Lv.' + u.level + '</td><td>' + u.exp + '</td><td>' + (u.last_login_at || '-') + '</td>' +
     '<td><div class="actions">' + userActions(u) + '</div></td></tr>').join('');
   $('#user-table').innerHTML =
-    '<table><thead><tr><th>ID</th><th>用户名</th><th>昵称</th><th>角色</th><th>状态</th><th>等级</th><th>经验</th><th>最近登录</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<div class="table-wrap"><table><thead><tr><th>ID</th><th>用户名</th><th>昵称</th><th>角色</th><th>状态</th><th>等级</th><th>经验</th><th>最近登录</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<div class="pager"><button id="prev"' + (d.page <= 1 ? ' disabled' : '') + '>上一页</button>' +
     '<span>第 ' + d.page + ' / ' + Math.max(1, Math.ceil(d.total / d.size)) + ' 页（共 ' + d.total + ' 人）</span>' +
     '<button id="next"' + (d.page * d.size >= d.total ? ' disabled' : '') + '>下一页</button></div>';
@@ -195,7 +195,7 @@ async function loadAchievements(c) {
       '<td>' + a.unlocked_count + '</td>' +
       '<td>' + (a.active ? '<span class="badge badge-ok">启用</span>' : '<span class="badge badge-off">停用</span>') + '</td>' +
       '<td><button class="btn ' + (a.active ? 'btn-danger' : 'btn-ghost') + ' btn-sm" onclick="toggleAch(' + a.id + ')">' + (a.active ? '停用' : '启用') + '</button></td></tr>').join('');
-    c.innerHTML = '<div class="card"><table><thead><tr><th>ID</th><th>代码</th><th>名称</th><th>说明</th><th>分类</th><th>条件</th><th>经验</th><th>解锁数</th><th>状态</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    c.innerHTML = '<div class="card"><div class="table-wrap"><table><thead><tr><th>ID</th><th>代码</th><th>名称</th><th>说明</th><th>分类</th><th>条件</th><th>经验</th><th>解锁数</th><th>状态</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   } catch (e) {
     c.innerHTML = '<div class="loading">加载失败：' + e.message + '</div>';
   }
@@ -215,7 +215,7 @@ async function loadLogs(c) {
     const d = await api('admin/logs');
     const rows = (d.logs || []).map(l =>
       '<tr><td>' + l.id + '</td><td>' + esc(l.username) + '</td><td>' + esc(l.nickname || '-') + '</td><td>' + l.last_login_at + '</td></tr>').join('');
-    c.innerHTML = '<div class="card"><table><thead><tr><th>ID</th><th>用户名</th><th>昵称</th><th>最近登录</th></tr></thead><tbody>' + (rows || '<tr><td colspan="4" style="color:var(--muted)">暂无登录记录</td></tr>') + '</tbody></table></div>';
+    c.innerHTML = '<div class="card"><div class="table-wrap"><table><thead><tr><th>ID</th><th>用户名</th><th>昵称</th><th>最近登录</th></tr></thead><tbody>' + (rows || '<tr><td colspan="4" style="color:var(--muted)">暂无登录记录</td></tr>') + '</tbody></table></div></div>';
   } catch (e) {
     c.innerHTML = '<div class="loading">加载失败：' + e.message + '</div>';
   }
