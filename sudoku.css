@@ -73,6 +73,8 @@ main{display:grid;grid-template-columns:180px minmax(330px,540px) 1fr;gap:40px;a
 .lb-meta{font-size:10px;color:var(--muted);margin-top:2px;display:flex;gap:8px}
 .lb-meta span{white-space:nowrap}
 .lb-lv{flex:none;font-size:10px;font-weight:650;color:var(--green);background:var(--pale);border-radius:8px;padding:2px 7px}
+.lb-sep{text-align:center;color:var(--muted);font-size:12px;letter-spacing:.3em;line-height:1;padding:2px 0}
+.lb-mytag{display:inline-block;margin-left:6px;font-size:9px;font-weight:600;color:#fff;background:var(--green);border-radius:6px;padding:1px 5px;vertical-align:1px}
 .eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
 .heading{display:flex;justify-content:space-between;align-items:end;margin-bottom:18px}
 .heading h2{font-size:25px;margin:8px 0 0;font-weight:600}

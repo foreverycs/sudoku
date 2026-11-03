@@ -419,7 +419,7 @@
       const list = d.ranking || [];
       if (!list.length) { el.innerHTML = '<div class="leader-loading">暂无上榜用户，快去闯关吧</div>'; return; }
       const uid = currentUser ? currentUser.id : -1;
-      el.innerHTML = list.map((u, i) => {
+      let html = list.map((u, i) => {
         const me = u.id === uid;
         const ava = u.avatar
           ? '<img src="' + u.avatar + '" alt="">'
@@ -432,6 +432,22 @@
           + '<span class="lb-lv">Lv.' + u.level + '</span>'
           + '</div>';
       }).join('');
+      // 「我的排名」固定底行：当前登录用户不在 top 时显示
+      if (d.my && d.my.rank) {
+        const m = d.my;
+        const mava = m.avatar
+          ? '<img src="' + m.avatar + '" alt="">'
+          : (m.nickname || m.username || '?').charAt(0).toUpperCase();
+        html += '<div class="lb-sep">···</div>'
+          + '<div class="lb-row me">'
+          + '<span class="lb-rank">' + m.rank + '</span>'
+          + '<span class="lb-ava">' + mava + '</span>'
+          + '<span class="lb-info"><span class="lb-name">' + esc(m.nickname || m.username) + '<small class="lb-mytag">我的排名</small></span>'
+          + '<span class="lb-meta"><span>🏅' + m.ach_count + '</span><span>✅' + m.done_count + '</span></span></span>'
+          + '<span class="lb-lv">Lv.' + m.level + '</span>'
+          + '</div>';
+      }
+      el.innerHTML = html;
     } catch (e) {
       el.innerHTML = '<div class="leader-loading">排行榜加载失败</div>';
     }
@@ -589,6 +605,7 @@
         updateUserUI(); closeAuth();
         renderLevelCard(currentUser);
         loadAchievements();
+        loadLeaderboard();
         say('欢迎回来，' + (currentUser.nickname || currentUser.username));
         const changed = await syncProgress();
         if (changed) loadLevel(level);
@@ -615,6 +632,7 @@
         updateUserUI(); closeAuth();
         renderLevelCard(currentUser);
         loadAchievements();
+        loadLeaderboard();
         say('注册成功，欢迎加入！');
         const changed = await syncProgress();
         if (changed) loadLevel(level);
@@ -635,6 +653,7 @@
     $('logout-btn').onclick = () => {
       tokenSet(''); currentUser = null;
       updateUserUI();
+      loadLeaderboard();
       say('已退出登录，进度将仅保存在本地');
     };
     // 弹窗 Escape 关闭

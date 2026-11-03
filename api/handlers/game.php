@@ -130,7 +130,7 @@ function me_stats() {
     ok(array('stats' => $stats, 'bestByLevel' => $bestByLevel));
 }
 
-/** GET leaderboard：排行榜（按等级+经验排序，公开，前 N 名） */
+/** GET leaderboard：排行榜（按等级+经验排序，公开，前 N 名）+ 当前用户排名 */
 function leaderboard() {
     $limit = isset($_GET['limit']) ? min(50, max(5, (int)$_GET['limit'])) : 10;
     $st = db()->query(
@@ -147,5 +147,45 @@ function leaderboard() {
         $r['ach_count'] = (int)$r['ach_count'];
         $r['done_count'] = (int)$r['done_count'];
     }
-    ok(array('ranking' => $rows, 'count' => count($rows)));
+    unset($r); // 断开 foreach 引用残留，避免后续循环污染
+    // 当前用户排名（可选，未登录则忽略）
+    $my = null;
+    $token = bearer_token();
+    if ($token) {
+        $p = jwt_decode($token);
+        if ($p && isset($p['uid'])) {
+            $uid = (int)$p['uid'];
+            $inTop = false;
+            foreach ($rows as $r) { if ((int)$r['id'] === $uid) { $inTop = true; break; } }
+            if (!$inTop) {
+                // 计算该用户在所有活跃用户中的排名
+                $all = db()->query(
+                    'SELECT u.id, u.username, u.nickname, u.avatar, u.level, u.exp,'
+                    . ' (SELECT COUNT(*) FROM user_achievements ua WHERE ua.user_id = u.id) AS ach_count,'
+                    . ' (SELECT COUNT(DISTINCT gr.level) FROM game_records gr WHERE gr.user_id = u.id) AS done_count'
+                    . ' FROM users u WHERE u.role = "user" AND u.status = 1'
+                    . ' ORDER BY u.level DESC, u.exp DESC, u.id ASC'
+                )->fetchAll();
+                $rank = 0;
+                foreach ($all as $i => $r) {
+                    if ((int)$r['id'] === $uid) { $rank = $i + 1; break; }
+                }
+                if ($rank > 0) {
+                    $me = $all[$rank - 1];
+                    $my = array(
+                        'rank' => $rank,
+                        'id' => (int)$me['id'],
+                        'username' => $me['username'],
+                        'nickname' => $me['nickname'],
+                        'avatar' => $me['avatar'],
+                        'level' => (int)$me['level'],
+                        'exp' => (int)$me['exp'],
+                        'ach_count' => (int)$me['ach_count'],
+                        'done_count' => (int)$me['done_count'],
+                    );
+                }
+            }
+        }
+    }
+    ok(array('ranking' => $rows, 'count' => count($rows), 'my' => $my));
 }
