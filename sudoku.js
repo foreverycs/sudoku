@@ -604,18 +604,6 @@
     return changed;
   }
 
-  // linux.do OAuth 回调：处理 ?login=linuxdo&token=...&err=...
-  function handleOAuth() {
-    const p = new URLSearchParams(location.search);
-    const t = p.get('token');
-    const err = p.get('err');
-    const isOAuth = p.get('login') === 'linuxdo' || t || err;
-    if (!isOAuth) return;
-    if (t) tokenSet(t);
-    history.replaceState(null, '', location.pathname + location.hash);
-    if (err) setTimeout(() => say('登录失败：' + err), 300);
-  }
-
   async function initAuth() {
     if (!tokenGet()) { updateUserUI(); return; }
     try {
@@ -641,8 +629,6 @@
     $('tab-register').onclick = () => switchAuthTab('register');
     $('auth-close').onclick = closeAuth;
     $('auth-overlay').addEventListener('click', e => { if (e.target === $('auth-overlay')) closeAuth(); });
-    const ldBtn = $('linuxdo-btn');
-    if (ldBtn) ldBtn.onclick = () => { location.href = API_BASE + 'auth/linuxdo/start'; };
 
     $('login-form').addEventListener('submit', async e => {
       e.preventDefault();
@@ -718,7 +704,6 @@
     });
   }
 
-  handleOAuth();
   bindAuth();
   initAuth();
   loadLeaderboard();
