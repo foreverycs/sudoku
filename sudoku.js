@@ -80,7 +80,11 @@
     seconds = Math.min(1e5, Math.max(0, (st && st.seconds) | 0));
     noteMode = false;
     $('notes').classList.remove('active');
-    persist(); render(); startTimer();
+    persist(); render();
+    // 进入关卡不立即计时，首次操作（填数）才开始
+    playAcc = seconds * 1000;
+    playStart = 0;
+    updateTimer();
     loadLeaderboard(level);
   }
 
@@ -194,6 +198,7 @@
 
   function enter(d) {
     if (selected < 0 || given[selected]) return;
+    if (!playStart) startTimer(); // 首次操作（填数/笔记）才开始计时
     history.push({ board: board.slice(), notes: notes.map(s => new Set(s)) });
     if (noteMode) {
       if (notes[selected].has(d)) notes[selected].delete(d); else notes[selected].add(d);
@@ -224,6 +229,7 @@
     if (isRecord) best[level] = t;
     saveGame();
     clearInterval(timerId); timerId = null;
+    playStart = 0; // 完成停表
     $('modal-time').textContent = fmt(t);
     $('modal-best').textContent = isRecord ? '新纪录！' : fmt(prev);
     $('modal-record').style.display = isRecord ? 'inline-block' : 'none';
@@ -274,6 +280,12 @@
   $('undo').onclick = () => {
     const h = history.pop();
     if (h) { board = h.board; notes = h.notes; saveGame(); render(); } else say('暂无可撤销操作');
+  };
+  $('restart').onclick = () => {
+    if (saved.boards) delete saved.boards[level];
+    clearInterval(timerId); timerId = null; playAcc = 0; playStart = 0;
+    loadLevel(level);
+    say('已重新开始第 ' + level + ' 关');
   };
   $('erase').onclick = erase;
   $('notes').onclick = () => { noteMode = !noteMode; $('notes').classList.toggle('active', noteMode); say(noteMode ? '笔记模式已开启' : '笔记模式已关闭'); };
