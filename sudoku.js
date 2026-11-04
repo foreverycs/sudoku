@@ -442,6 +442,11 @@
 
   // ===== 排行榜（阶段六） =====
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+  function fmtClock(s) {
+    if (s == null) return '--';
+    const m = Math.floor(s / 60), sec = s % 60;
+    return (m < 10 ? '0' + m : '' + m) + ':' + (sec < 10 ? '0' + sec : '' + sec);
+  }
   async function loadLeaderboard() {
     const el = $('leader-list');
     if (!el) return;
@@ -450,7 +455,7 @@
       const list = d.ranking || [];
       if (!list.length) { el.innerHTML = '<div class="leader-loading">暂无上榜用户，快去闯关吧</div>'; return; }
       const uid = currentUser ? currentUser.id : -1;
-      let html = list.map((u, i) => {
+      const rowHtml = (u, i, extraTag) => {
         const me = u.id === uid;
         const ava = u.avatar
           ? '<img src="' + u.avatar + '" alt="">'
@@ -458,25 +463,15 @@
         return '<div class="lb-row' + (me ? ' me' : '') + '">'
           + '<span class="lb-rank">' + (i + 1) + '</span>'
           + '<span class="lb-ava">' + ava + '</span>'
-          + '<span class="lb-info"><span class="lb-name">' + esc(u.nickname || u.username) + '</span>'
-          + '<span class="lb-meta"><span>🏅' + u.ach_count + '</span><span>✅' + u.done_count + '</span></span></span>'
-          + '<span class="lb-lv">Lv.' + u.level + '</span>'
+          + '<span class="lb-info"><span class="lb-name">' + esc(u.nickname || u.username) + (extraTag || '') + '</span>'
+          + '<span class="lb-meta"><span>第 ' + u.cur_level + ' 关</span><span>⏱ ' + fmtClock(u.cur_best) + '</span></span></span>'
           + '</div>';
-      }).join('');
+      };
+      let html = list.map((u, i) => rowHtml(u, i)).join('');
       // 「我的排名」固定底行：当前登录用户不在 top 时显示
       if (d.my && d.my.rank) {
-        const m = d.my;
-        const mava = m.avatar
-          ? '<img src="' + m.avatar + '" alt="">'
-          : (m.nickname || m.username || '?').charAt(0).toUpperCase();
         html += '<div class="lb-sep">···</div>'
-          + '<div class="lb-row me">'
-          + '<span class="lb-rank">' + m.rank + '</span>'
-          + '<span class="lb-ava">' + mava + '</span>'
-          + '<span class="lb-info"><span class="lb-name">' + esc(m.nickname || m.username) + '<small class="lb-mytag">我的排名</small></span>'
-          + '<span class="lb-meta"><span>🏅' + m.ach_count + '</span><span>✅' + m.done_count + '</span></span></span>'
-          + '<span class="lb-lv">Lv.' + m.level + '</span>'
-          + '</div>';
+          + rowHtml(d.my, d.my.rank - 1, '<small class="lb-mytag">我的排名</small>');
       }
       el.innerHTML = html;
     } catch (e) {

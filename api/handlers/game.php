@@ -146,24 +146,44 @@ function me_stats() {
     ok(array('stats' => $stats, 'bestByLevel' => $bestByLevel));
 }
 
-/** GET leaderboard：排行榜（按等级+经验排序，公开，前 N 名）+ 当前用户排名 */
+/** 排行榜单行耗时：该关最佳完成用时，无则进行中用时，再无则 null */
+function leader_time($pdo, $uid, $level) {
+    $st = $pdo->prepare('SELECT MIN(seconds) AS best FROM game_records WHERE user_id = ? AND level = ?');
+    $st->execute([$uid, $level]);
+    $b = $st->fetch();
+    if ($b && $b['best'] !== null) return (int)$b['best'];
+    $st = $pdo->prepare('SELECT seconds FROM game_progress WHERE user_id = ? AND level = ? ORDER BY updated_at DESC LIMIT 1');
+    $st->execute([$uid, $level]);
+    $p = $st->fetch();
+    return ($p && $p['seconds'] !== null) ? (int)$p['seconds'] : null;
+}
+
+/** GET leaderboard：进度榜（按当前关卡数+该关耗时排序，公开，前 N 名）+ 当前用户排名 */
 function leaderboard() {
     $limit = isset($_GET['limit']) ? min(50, max(5, (int)$_GET['limit'])) : 10;
-    $st = db()->query(
-        'SELECT u.id, u.username, u.nickname, u.avatar, u.level, u.exp,'
-        . ' (SELECT COUNT(*) FROM user_achievements ua WHERE ua.user_id = u.id) AS ach_count,'
-        . ' (SELECT COUNT(DISTINCT gr.level) FROM game_records gr WHERE gr.user_id = u.id) AS done_count'
+    $pdo = db();
+    $st = $pdo->query(
+        'SELECT u.id, u.username, u.nickname, u.avatar,'
+        . ' (SELECT MAX(gr.level) FROM game_records gr WHERE gr.user_id = u.id) AS ml'
         . ' FROM users u WHERE u.role = "user" AND u.status = 1'
-        . ' ORDER BY u.level DESC, u.exp DESC, u.id ASC LIMIT ' . $limit
     );
     $rows = $st->fetchAll();
     foreach ($rows as &$r) {
-        $r['level'] = (int)$r['level'];
-        $r['exp'] = (int)$r['exp'];
-        $r['ach_count'] = (int)$r['ach_count'];
-        $r['done_count'] = (int)$r['done_count'];
+        $ml = ($r['ml'] !== null) ? (int)$r['ml'] : 0;
+        $r['cur_level'] = $ml + 1; // 进行到的关卡 = 已完成最高关 + 1
+        $r['cur_best'] = leader_time($pdo, (int)$r['id'], $r['cur_level']);
+        unset($r['ml']);
     }
-    unset($r); // 断开 foreach 引用残留，避免后续循环污染
+    unset($r);
+    // 排序：当前关卡数降序，同关用时短优先（无用时排后）
+    usort($rows, function ($a, $b) {
+        if ($a['cur_level'] !== $b['cur_level']) return $b['cur_level'] - $a['cur_level'];
+        $ab = ($a['cur_best'] === null) ? PHP_INT_MAX : $a['cur_best'];
+        $bb = ($b['cur_best'] === null) ? PHP_INT_MAX : $b['cur_best'];
+        if ($ab !== $bb) return $ab - $bb;
+        return (int)$a['id'] - (int)$b['id'];
+    });
+    $rows = array_slice($rows, 0, $limit);
     // 当前用户排名（可选，未登录则忽略）
     $my = null;
     $token = bearer_token();
@@ -174,14 +194,26 @@ function leaderboard() {
             $inTop = false;
             foreach ($rows as $r) { if ((int)$r['id'] === $uid) { $inTop = true; break; } }
             if (!$inTop) {
-                // 计算该用户在所有活跃用户中的排名
-                $all = db()->query(
-                    'SELECT u.id, u.username, u.nickname, u.avatar, u.level, u.exp,'
-                    . ' (SELECT COUNT(*) FROM user_achievements ua WHERE ua.user_id = u.id) AS ach_count,'
-                    . ' (SELECT COUNT(DISTINCT gr.level) FROM game_records gr WHERE gr.user_id = u.id) AS done_count'
+                // 全部活跃用户（按同一排序）
+                $all = $pdo->query(
+                    'SELECT u.id, u.username, u.nickname, u.avatar,'
+                    . ' (SELECT MAX(gr.level) FROM game_records gr WHERE gr.user_id = u.id) AS ml'
                     . ' FROM users u WHERE u.role = "user" AND u.status = 1'
-                    . ' ORDER BY u.level DESC, u.exp DESC, u.id ASC'
                 )->fetchAll();
+                foreach ($all as &$a2) {
+                    $ml = ($a2['ml'] !== null) ? (int)$a2['ml'] : 0;
+                    $a2['cur_level'] = $ml + 1;
+                    $a2['cur_best'] = leader_time($pdo, (int)$a2['id'], $a2['cur_level']);
+                    unset($a2['ml']);
+                }
+                unset($a2);
+                usort($all, function ($a, $b) {
+                    if ($a['cur_level'] !== $b['cur_level']) return $b['cur_level'] - $a['cur_level'];
+                    $ab = ($a['cur_best'] === null) ? PHP_INT_MAX : $a['cur_best'];
+                    $bb = ($b['cur_best'] === null) ? PHP_INT_MAX : $b['cur_best'];
+                    if ($ab !== $bb) return $ab - $bb;
+                    return (int)$a['id'] - (int)$b['id'];
+                });
                 $rank = 0;
                 foreach ($all as $i => $r) {
                     if ((int)$r['id'] === $uid) { $rank = $i + 1; break; }
@@ -194,10 +226,8 @@ function leaderboard() {
                         'username' => $me['username'],
                         'nickname' => $me['nickname'],
                         'avatar' => $me['avatar'],
-                        'level' => (int)$me['level'],
-                        'exp' => (int)$me['exp'],
-                        'ach_count' => (int)$me['ach_count'],
-                        'done_count' => (int)$me['done_count'],
+                        'cur_level' => (int)$me['cur_level'],
+                        'cur_best' => $me['cur_best'],
                     );
                 }
             }
