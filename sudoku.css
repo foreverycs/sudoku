@@ -171,9 +171,16 @@ main{display:grid;grid-template-columns:180px minmax(330px,540px) 1fr;gap:40px;a
 @media(max-width:760px){
   html,body{width:100%;max-width:100%;overflow-x:hidden}
   .shell{width:100%;max-width:100%;padding:18px 14px 30px}
-  .top{flex-wrap:wrap;gap:8px}
+  .top{flex-wrap:nowrap;gap:8px}
   .top-note{display:none}
-  .top-right{margin-left:auto}
+  .top-right{margin-left:auto;gap:8px}
+  .brand{gap:8px}
+  .mark{width:30px;height:30px;font-size:15px;border-radius:9px}
+  .brand h1{font-size:14px}
+  .brand small{font-size:9px;letter-spacing:.05em;margin-top:2px}
+  .user-chip{padding:3px 9px 3px 3px;gap:5px}
+  .uname{max-width:64px}
+  .avatar{width:22px;height:22px;font-size:11px}
   main{display:flex;flex-direction:column;gap:30px;padding:24px 0;width:100%;min-width:0}
   .board-wrap,.side{width:100%;max-width:100%;min-width:0}
   .leader{width:100%;max-width:100%;min-width:0}
