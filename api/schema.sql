@@ -7,12 +7,15 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   nickname      VARCHAR(32)  NOT NULL DEFAULT '',
   avatar        VARCHAR(255) NOT NULL DEFAULT '',
+  oauth_provider VARCHAR(16) NULL DEFAULT NULL,
+  oauth_uid      VARCHAR(64) NULL DEFAULT NULL,
   role          ENUM('user','admin') NOT NULL DEFAULT 'user',
   status        TINYINT      NOT NULL DEFAULT 1,
   exp           INT          NOT NULL DEFAULT 0,
   level         INT          NOT NULL DEFAULT 1,
   last_login_at DATETIME     NULL,
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_oauth (oauth_provider, oauth_uid),
   INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

@@ -34,6 +34,8 @@ try {
     if ($method === 'POST' && $r === 'auth/register') return auth_register();
     if ($method === 'POST' && $r === 'auth/login')    return auth_login();
     if ($method === 'GET'  && $r === 'auth/me')       return auth_me();
+    if ($method === 'GET'  && $r === 'auth/linuxdo/start')    return auth_linuxdo_start();
+    if ($method === 'GET'  && $r === 'auth/linuxdo/callback') return auth_linuxdo_callback();
     if ($method === 'GET'  && $r === 'progress')      return progress_all();
     if ($method === 'PUT'  && preg_match('#^progress/(\d{1,3})$#', $r, $m)) return progress_save((int)$m[1]);
     if ($method === 'POST' && $r === 'game/complete') return game_complete();

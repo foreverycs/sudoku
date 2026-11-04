@@ -236,6 +236,12 @@ main{display:grid;grid-template-columns:180px minmax(330px,540px) 1fr;gap:40px;a
 .auth-submit:hover{filter:brightness(1.06)}
 .auth-submit:disabled{opacity:.6;cursor:default}
 .auth-msg{min-height:18px;margin:10px 0 0;font-size:12px;color:var(--red);text-align:center;white-space:pre-wrap}
+.auth-oauth-wrap{margin-top:16px}
+.auth-divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin-bottom:12px}
+.auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:var(--line)}
+.auth-oauth{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:var(--card);color:var(--ctrl-ink);border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.auth-oauth:hover{border-color:var(--hover-border);color:var(--green)}
+.ld-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:#f2b90d;color:#1a1a1a;font-size:11px;font-weight:800;letter-spacing:.3px}
 
 /* ===== 等级卡（阶段三） ===== */
 .level-card{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:14px 16px;margin-bottom:16px}
