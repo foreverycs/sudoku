@@ -146,43 +146,34 @@ function me_stats() {
     ok(array('stats' => $stats, 'bestByLevel' => $bestByLevel));
 }
 
-/** 排行榜单行耗时：该关最佳完成用时，无则进行中用时，再无则 null */
-function leader_time($pdo, $uid, $level) {
-    $st = $pdo->prepare('SELECT MIN(seconds) AS best FROM game_records WHERE user_id = ? AND level = ?');
-    $st->execute([$uid, $level]);
-    $b = $st->fetch();
-    if ($b && $b['best'] !== null) return (int)$b['best'];
-    $st = $pdo->prepare('SELECT seconds FROM game_progress WHERE user_id = ? AND level = ? ORDER BY updated_at DESC LIMIT 1');
-    $st->execute([$uid, $level]);
-    $p = $st->fetch();
-    return ($p && $p['seconds'] !== null) ? (int)$p['seconds'] : null;
+/** 排序：该关最佳用时短优先（无用时排后） */
+function leader_sort($a, $b) {
+    $ab = ($a['best'] === null) ? PHP_INT_MAX : $a['best'];
+    $bb = ($b['best'] === null) ? PHP_INT_MAX : $b['best'];
+    if ($ab !== $bb) return $ab - $bb;
+    return (int)$a['id'] - (int)$b['id'];
 }
 
-/** GET leaderboard：进度榜（按当前关卡数+该关耗时排序，公开，前 N 名）+ 当前用户排名 */
+/** GET leaderboard：某关卡时间榜（该关最佳用时短优先，公开，前 N 名）+ 当前用户排名 */
 function leaderboard() {
     $limit = isset($_GET['limit']) ? min(50, max(5, (int)$_GET['limit'])) : 10;
+    $level = isset($_GET['level']) ? (int)$_GET['level'] : 1;
+    if ($level < 1) $level = 1;
+    if ($level > 100) $level = 100;
     $pdo = db();
-    $st = $pdo->query(
-        'SELECT u.id, u.username, u.nickname, u.avatar,'
-        . ' (SELECT MAX(gr.level) FROM game_records gr WHERE gr.user_id = u.id) AS ml'
-        . ' FROM users u WHERE u.role = "user" AND u.status = 1'
+    $st = $pdo->prepare(
+        'SELECT u.id, u.username, u.nickname, u.avatar, MIN(gr.seconds) AS best'
+        . ' FROM users u LEFT JOIN game_records gr ON gr.user_id = u.id AND gr.level = ?'
+        . ' WHERE u.role = "user" AND u.status = 1'
+        . ' GROUP BY u.id, u.username, u.nickname, u.avatar'
     );
+    $st->execute([$level]);
     $rows = $st->fetchAll();
     foreach ($rows as &$r) {
-        $ml = ($r['ml'] !== null) ? (int)$r['ml'] : 0;
-        $r['cur_level'] = $ml + 1; // 进行到的关卡 = 已完成最高关 + 1
-        $r['cur_best'] = leader_time($pdo, (int)$r['id'], $r['cur_level']);
-        unset($r['ml']);
+        $r['best'] = ($r['best'] !== null) ? (int)$r['best'] : null;
     }
     unset($r);
-    // 排序：当前关卡数降序，同关用时短优先（无用时排后）
-    usort($rows, function ($a, $b) {
-        if ($a['cur_level'] !== $b['cur_level']) return $b['cur_level'] - $a['cur_level'];
-        $ab = ($a['cur_best'] === null) ? PHP_INT_MAX : $a['cur_best'];
-        $bb = ($b['cur_best'] === null) ? PHP_INT_MAX : $b['cur_best'];
-        if ($ab !== $bb) return $ab - $bb;
-        return (int)$a['id'] - (int)$b['id'];
-    });
+    usort($rows, 'leader_sort');
     $rows = array_slice($rows, 0, $limit);
     // 当前用户排名（可选，未登录则忽略）
     $my = null;
@@ -194,26 +185,17 @@ function leaderboard() {
             $inTop = false;
             foreach ($rows as $r) { if ((int)$r['id'] === $uid) { $inTop = true; break; } }
             if (!$inTop) {
-                // 全部活跃用户（按同一排序）
-                $all = $pdo->query(
-                    'SELECT u.id, u.username, u.nickname, u.avatar,'
-                    . ' (SELECT MAX(gr.level) FROM game_records gr WHERE gr.user_id = u.id) AS ml'
-                    . ' FROM users u WHERE u.role = "user" AND u.status = 1'
-                )->fetchAll();
-                foreach ($all as &$a2) {
-                    $ml = ($a2['ml'] !== null) ? (int)$a2['ml'] : 0;
-                    $a2['cur_level'] = $ml + 1;
-                    $a2['cur_best'] = leader_time($pdo, (int)$a2['id'], $a2['cur_level']);
-                    unset($a2['ml']);
-                }
+                $all = $pdo->prepare(
+                    'SELECT u.id, u.username, u.nickname, u.avatar, MIN(gr.seconds) AS best'
+                    . ' FROM users u LEFT JOIN game_records gr ON gr.user_id = u.id AND gr.level = ?'
+                    . ' WHERE u.role = "user" AND u.status = 1'
+                    . ' GROUP BY u.id, u.username, u.nickname, u.avatar'
+                );
+                $all->execute([$level]);
+                $all = $all->fetchAll();
+                foreach ($all as &$a2) { $a2['best'] = ($a2['best'] !== null) ? (int)$a2['best'] : null; }
                 unset($a2);
-                usort($all, function ($a, $b) {
-                    if ($a['cur_level'] !== $b['cur_level']) return $b['cur_level'] - $a['cur_level'];
-                    $ab = ($a['cur_best'] === null) ? PHP_INT_MAX : $a['cur_best'];
-                    $bb = ($b['cur_best'] === null) ? PHP_INT_MAX : $b['cur_best'];
-                    if ($ab !== $bb) return $ab - $bb;
-                    return (int)$a['id'] - (int)$b['id'];
-                });
+                usort($all, 'leader_sort');
                 $rank = 0;
                 foreach ($all as $i => $r) {
                     if ((int)$r['id'] === $uid) { $rank = $i + 1; break; }
@@ -226,12 +208,11 @@ function leaderboard() {
                         'username' => $me['username'],
                         'nickname' => $me['nickname'],
                         'avatar' => $me['avatar'],
-                        'cur_level' => (int)$me['cur_level'],
-                        'cur_best' => $me['cur_best'],
+                        'best' => $me['best'],
                     );
                 }
             }
         }
     }
-    ok(array('ranking' => $rows, 'count' => count($rows), 'my' => $my));
+    ok(array('ranking' => $rows, 'count' => count($rows), 'my' => $my, 'level' => $level));
 }

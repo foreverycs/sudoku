@@ -81,6 +81,7 @@
     noteMode = false;
     $('notes').classList.remove('active');
     persist(); render(); startTimer();
+    loadLeaderboard(level);
   }
 
   function startTimer() {
@@ -447,13 +448,16 @@
     const m = Math.floor(s / 60), sec = s % 60;
     return (m < 10 ? '0' + m : '' + m) + ':' + (sec < 10 ? '0' + sec : '' + sec);
   }
-  async function loadLeaderboard() {
+  async function loadLeaderboard(lv) {
     const el = $('leader-list');
     if (!el) return;
+    const cur = lv || level || 1;
+    const intro = $('leader-intro');
+    if (intro) intro.textContent = '第 ' + cur + ' 关 · 用时越短越靠前';
     try {
-      const d = await apiCall('leaderboard', 'GET');
+      const d = await apiCall('leaderboard&level=' + cur, 'GET');
       const list = d.ranking || [];
-      if (!list.length) { el.innerHTML = '<div class="leader-loading">暂无上榜用户，快去闯关吧</div>'; return; }
+      if (!list.length) { el.innerHTML = '<div class="leader-loading">暂无上榜用户</div>'; return; }
       const uid = currentUser ? currentUser.id : -1;
       const rowHtml = (u, i, extraTag) => {
         const me = u.id === uid;
@@ -464,7 +468,7 @@
           + '<span class="lb-rank">' + (i + 1) + '</span>'
           + '<span class="lb-ava">' + ava + '</span>'
           + '<span class="lb-info"><span class="lb-name">' + esc(u.nickname || u.username) + (extraTag || '') + '</span>'
-          + '<span class="lb-meta"><span>第 ' + u.cur_level + ' 关</span><span>⏱ ' + fmtClock(u.cur_best) + '</span></span></span>'
+          + '<span class="lb-meta"><span>⏱ ' + fmtClock(u.best) + '</span></span></span>'
           + '</div>';
       };
       let html = list.map((u, i) => rowHtml(u, i)).join('');
