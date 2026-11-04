@@ -173,6 +173,7 @@ main{display:grid;grid-template-columns:180px minmax(330px,540px) 1fr;gap:40px;a
   .shell{width:100%;max-width:100%;padding:18px 14px 30px}
   .top{flex-wrap:wrap;gap:8px}
   .top-note{display:none}
+  .top-right{margin-left:auto}
   main{display:flex;flex-direction:column;gap:30px;padding:24px 0;width:100%;min-width:0}
   .board-wrap,.side{width:100%;max-width:100%;min-width:0}
   .leader{width:100%;max-width:100%;min-width:0}
