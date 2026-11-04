@@ -179,6 +179,9 @@ function auth_linuxdo_start() {
 
 /** GET auth/linuxdo/callback：换 token → 取用户 → 登录/注册 → 发 JWT 跳回前端 */
 function auth_linuxdo_callback() {
+    if (isset($_GET['error']) && $_GET['error'] !== '') {
+        ld_redirect_err('授权未完成：' . (string)$_GET['error']);
+    }
     $code  = isset($_GET['code']) ? (string)$_GET['code'] : '';
     $state = isset($_GET['state']) ? (string)$_GET['state'] : '';
     $saved = isset($_COOKIE['ld_oauth_state']) ? (string)$_COOKIE['ld_oauth_state'] : '';
