@@ -584,6 +584,22 @@
     if (!currentUser) return;
     let cloud = {};
     try { cloud = (await apiCall('progress', 'GET')).progress || {}; } catch { return; }
+    // 方案一：同步完成状态/最佳成绩/解锁进度，保证同一账号跨设备一致
+    let statChanged = false;
+    try {
+      const st = await apiCall('me/stats', 'GET');
+      const cloudBest = st.bestByLevel || {};
+      Object.keys(cloudBest).forEach(k => {
+        const lv = +k;
+        if (!lv || lv < 1 || lv > N) return;
+        const cb = Math.max(1, Math.floor(cloudBest[k] | 0));
+        if (!completed.has(lv)) { completed.add(lv); statChanged = true; }
+        if (!best[lv] || cb < best[lv]) { best[lv] = cb; statChanged = true; }
+      });
+      let maxC = 0; completed.forEach(v => { if (v > maxC) maxC = v; });
+      const nu = clamp(maxC + 1, 1, N);
+      if (nu !== unlocked) { unlocked = nu; statChanged = true; }
+    } catch (e) { /* me/stats 失败不影响棋盘同步 */ }
     saved.boards = saved.boards || {};
     let changed = false;
     Object.keys(cloud).forEach(k => {
@@ -600,7 +616,8 @@
       if (!b || !Array.isArray(b.cells)) return;
       apiCall('progress/' + lv, 'PUT', { cells: cellsToStr(b.cells), notes: notesToObj(b.notes || []), seconds: (b.seconds | 0) }).catch(() => {});
     });
-    if (changed) persist();
+    if (changed || statChanged) persist();
+    if (statChanged) render();
     return changed;
   }
 
