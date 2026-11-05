@@ -154,6 +154,11 @@ function leader_sort($a, $b) {
     return (int)$a['id'] - (int)$b['id'];
 }
 
+/** 排行榜过滤：仅保留该关有成绩的用户（无成绩者不上榜） */
+function leader_has_best($r) {
+    return $r['best'] !== null;
+}
+
 /** GET leaderboard：某关卡时间榜（该关最佳用时短优先，公开，前 N 名）+ 当前用户排名 */
 function leaderboard() {
     $limit = isset($_GET['limit']) ? min(50, max(5, (int)$_GET['limit'])) : 10;
@@ -173,6 +178,7 @@ function leaderboard() {
         $r['best'] = ($r['best'] !== null) ? (int)$r['best'] : null;
     }
     unset($r);
+    $rows = array_filter($rows, 'leader_has_best');
     usort($rows, 'leader_sort');
     $rows = array_slice($rows, 0, $limit);
     // 当前用户排名（可选，未登录则忽略）
@@ -195,6 +201,7 @@ function leaderboard() {
                 $all = $all->fetchAll();
                 foreach ($all as &$a2) { $a2['best'] = ($a2['best'] !== null) ? (int)$a2['best'] : null; }
                 unset($a2);
+                $all = array_filter($all, 'leader_has_best');
                 usort($all, 'leader_sort');
                 $rank = 0;
                 foreach ($all as $i => $r) {
