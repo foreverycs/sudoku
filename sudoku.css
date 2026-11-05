@@ -51,11 +51,11 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,"PingFa
 .theme-btn{width:34px;height:34px;border:1px solid var(--line);background:var(--card);border-radius:50%;cursor:pointer;font-size:15px;display:grid;place-items:center;color:var(--ink);transition:.15s;padding:0}
 .theme-btn:hover{border-color:var(--hover-border)}
 
-main{display:grid;grid-template-columns:180px minmax(330px,540px) 1fr;gap:40px;align-items:start;padding:44px 30px}
+main{display:grid;grid-template-columns:230px minmax(330px,540px) 1fr;gap:40px;align-items:start;padding:44px 30px}
 .board-wrap{max-width:520px;width:100%;margin:0 auto}
 
 /* ===== 排行榜 ===== */
-.leader{padding-top:15px}
+.leader{padding-top:15px;position:sticky;top:20px;align-self:start}
 .leader h3{font-size:13px;font-weight:600;margin:0 0 6px}
 .leader-intro{font-size:11px;color:var(--muted);margin:0 0 16px}
 .leader-list{display:flex;flex-direction:column;gap:8px}
@@ -75,6 +75,22 @@ main{display:grid;grid-template-columns:180px minmax(330px,540px) 1fr;gap:40px;a
 .lb-lv{flex:none;font-size:10px;font-weight:650;color:var(--green);background:var(--pale);border-radius:8px;padding:2px 7px}
 .lb-sep{text-align:center;color:var(--muted);font-size:12px;letter-spacing:.3em;line-height:1;padding:2px 0}
 .lb-mytag{display:inline-block;margin-left:6px;font-size:9px;font-weight:600;color:#fff;background:var(--green);border-radius:6px;padding:1px 5px;vertical-align:1px}
+
+/* ===== 左列：我的统计卡 ===== */
+.leader-stats{margin-top:24px;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:14px}
+.leader-stats h3{font-size:13px;font-weight:600;margin:0 0 10px}
+.ls-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.ls-grid div{text-align:center;background:var(--pale);border-radius:9px;padding:8px 2px}
+.ls-grid span{display:block;font-size:10px;color:var(--muted)}
+.ls-grid strong{display:block;margin-top:4px;font-size:15px;font-weight:600;color:var(--ink)}
+/* ===== 左列：章节进度 ===== */
+.chapter-progress{margin-top:24px}
+.chapter-progress h3{font-size:13px;font-weight:600;margin:0 0 12px}
+.ch-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.ch-name{flex:none;width:56px;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch-bar{flex:1;height:4px;background:var(--track);border-radius:4px;overflow:hidden}
+.ch-bar i{display:block;height:100%;background:var(--green);border-radius:4px;transition:width .25s}
+.ch-count{flex:none;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
 .eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
 .heading{display:flex;justify-content:space-between;align-items:end;margin-bottom:18px}
 .heading h2{font-size:25px;margin:8px 0 0;font-weight:600}
@@ -185,6 +201,7 @@ main{display:grid;grid-template-columns:180px minmax(330px,540px) 1fr;gap:40px;a
   .board-wrap,.side{width:100%;max-width:100%;min-width:0}
   .leader{width:100%;max-width:100%;min-width:0}
   .leader-list{flex-direction:row;overflow-x:auto;padding-bottom:4px}
+  .leader-stats,.chapter-progress{display:none!important}
   .lb-row{min-width:200px}
   .board{width:100%;min-width:0}
   .cell{font-size:clamp(15px,6vw,26px);min-height:0;min-width:0}

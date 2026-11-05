@@ -124,6 +124,42 @@
 
     renderNumbers();
     renderLevels();
+    renderLeaderStats();
+    renderChapters();
+  }
+
+  function renderLeaderStats() {
+    const box = $('leader-stats');
+    if (!box) return;
+    $('ls-completed').textContent = completed.size;
+    $('ls-best').textContent = best[level] ? fmt(best[level]) : '--';
+    $('ls-unlocked').textContent = unlocked;
+  }
+
+  function renderChapters() {
+    const root = $('chapter-list');
+    if (!root) return;
+    root.innerHTML = '';
+    for (let c = 0; c < 10; c++) {
+      const start = c * 10 + 1;
+      let done = 0;
+      for (let i = start; i < start + 10; i++) if (completed.has(i)) done++;
+      const name = document.createElement('span');
+      name.className = 'ch-name';
+      name.textContent = labels[c];
+      const bar = document.createElement('span');
+      bar.className = 'ch-bar';
+      const fill = document.createElement('i');
+      fill.style.width = (done * 10) + '%';
+      bar.append(fill);
+      const cnt = document.createElement('span');
+      cnt.className = 'ch-count';
+      cnt.textContent = done + '/10';
+      const row = document.createElement('div');
+      row.className = 'ch-row';
+      row.append(name, bar, cnt);
+      root.append(row);
+    }
   }
 
   let cellEls = [];
@@ -467,7 +503,7 @@
     const intro = $('leader-intro');
     if (intro) intro.textContent = '第 ' + cur + ' 关 · 用时越短越靠前';
     try {
-      const d = await apiCall('leaderboard&level=' + cur, 'GET');
+      const d = await apiCall('leaderboard&level=' + cur + '&limit=15', 'GET');
       const list = d.ranking || [];
       if (!list.length) { el.innerHTML = '<div class="leader-loading">暂无上榜用户</div>'; return; }
       const uid = currentUser ? currentUser.id : -1;
