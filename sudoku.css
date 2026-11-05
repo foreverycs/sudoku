@@ -52,7 +52,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,"PingFa
 .theme-btn:hover{border-color:var(--hover-border)}
 
 main{display:grid;grid-template-columns:180px minmax(330px,540px) 1fr;gap:40px;align-items:start;padding:44px 30px}
-.board-wrap{max-width:520px;width:100%;margin:auto}
+.board-wrap{max-width:520px;width:100%;margin:0 auto}
 
 /* ===== 排行榜 ===== */
 .leader{padding-top:15px}
