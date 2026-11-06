@@ -32,6 +32,43 @@ function admin_overview() {
         $st->execute([$day]);
         $daily[] = array('date' => $day, 'count' => (int)$st->fetch()['c']);
     }
+    // 最近7天每日挑战完成数
+    $dailyChallenge = array();
+    for ($i = 6; $i >= 0; $i--) {
+        $day = date('Y-m-d', strtotime('-' . $i . ' day'));
+        $st = $pdo->prepare('SELECT COUNT(*) AS c FROM daily_records WHERE date = ?');
+        $st->execute([$day]);
+        $dailyChallenge[] = array('date' => $day, 'count' => (int)$st->fetch()['c']);
+    }
+    // 最近7天注册数
+    $registrations = array();
+    for ($i = 6; $i >= 0; $i--) {
+        $day = date('Y-m-d', strtotime('-' . $i . ' day'));
+        $st = $pdo->prepare('SELECT COUNT(*) AS c FROM users WHERE DATE(created_at) = ?');
+        $st->execute([$day]);
+        $registrations[] = array('date' => $day, 'count' => (int)$st->fetch()['c']);
+    }
+    // 勋章解锁人数（active，按解锁数排序）
+    $st = $pdo->query(
+        'SELECT a.code, a.name, a.icon, COUNT(ua.user_id) AS cnt'
+        . ' FROM achievements a LEFT JOIN user_achievements ua ON ua.achievement_id = a.id'
+        . ' WHERE a.active = 1 GROUP BY a.id ORDER BY cnt DESC LIMIT 11'
+    );
+    $achStats = array();
+    foreach ($st->fetchAll() as $r) {
+        $achStats[] = array('code' => $r['code'], 'name' => $r['name'], 'icon' => $r['icon'], 'count' => (int)$r['cnt']);
+    }
+    // 难度分布（完成记录按关卡分档）
+    $diff = array('入门' => 0, '简单' => 0, '中等' => 0, '困难' => 0, '挑战' => 0);
+    $st = $pdo->query('SELECT level, COUNT(*) AS c FROM game_records GROUP BY level');
+    foreach ($st->fetchAll() as $r) {
+        $lv = (int)$r['level'];
+        if ($lv <= 20) $diff['入门'] += (int)$r['c'];
+        elseif ($lv <= 40) $diff['简单'] += (int)$r['c'];
+        elseif ($lv <= 60) $diff['中等'] += (int)$r['c'];
+        elseif ($lv <= 80) $diff['困难'] += (int)$r['c'];
+        else $diff['挑战'] += (int)$r['c'];
+    }
     ok(array(
         'users'      => (int)$u['c'],
         'records'    => (int)$g['c'],
@@ -41,6 +78,10 @@ function admin_overview() {
         'maxExp'     => (int)$mx['e'],
         'maxLevel'   => (int)$ml['l'],
         'daily'      => $daily,
+        'dailyChallenge' => $dailyChallenge,
+        'registrations'  => $registrations,
+        'achievementStats' => $achStats,
+        'difficultyDist'   => $diff,
     ));
 }
 

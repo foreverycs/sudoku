@@ -93,15 +93,36 @@ async function loadOverview(c) {
     const d = await api('admin/overview');
     const daily = d.daily || [];
     const maxC = Math.max(1, ...daily.map(x => x.count));
+    const barChart = (arr, label) => {
+      const mx = Math.max(1, ...(arr || []).map(x => x.count));
+      return '<div class="card"><h3>' + label + '</h3><div class="daily">' +
+        (arr || []).map(x => '<div class="bar-col"><span class="bar-v">' + x.count + '</span><div class="bar" style="height:' + (x.count / mx * 100) + '%"></div><span class="bar-l">' + x.date.slice(5) + '</span></div>').join('') +
+        '</div></div>';
+    };
+    const diff = d.difficultyDist || {};
+    const diffKeys = ['入门', '简单', '中等', '困难', '挑战'];
+    const diffMax = Math.max(1, ...diffKeys.map(k => diff[k] || 0));
+    const ach = d.achievementStats || [];
+    const achMax = Math.max(1, ...ach.map(x => x.count));
     c.innerHTML =
       '<div class="grid">' +
       stat(d.users, '注册用户') + stat(d.records, '完成记录') + stat(d.activeUsers, '活跃用户') +
       stat(d.achievements, '在售勋章') + stat(Math.round(d.totalSeconds / 60) + '分', '累计游玩') +
       stat('Lv.' + d.maxLevel, '最高等级') +
       '</div>' +
-      '<div class="card"><h3>近 7 天完成量</h3><div class="daily">' +
-      daily.map(x => '<div class="bar-col"><span class="bar-v">' + x.count + '</span><div class="bar" style="height:' + (x.count / maxC * 100) + '%"></div><span class="bar-l">' + x.date.slice(5) + '</span></div>').join('') +
-      '</div></div>';
+      barChart(daily, '近 7 天完成量') +
+      '<div class="grid2">' +
+      barChart(d.dailyChallenge, '近 7 天每日挑战完成') +
+      barChart(d.registrations, '近 7 天注册数') +
+      '</div>' +
+      '<div class="grid2">' +
+      '<div class="card"><h3>难度分布（完成记录）</h3><div class="rows">' +
+      diffKeys.map(k => '<div class="row"><span class="row-l">' + k + '</span><div class="row-bar"><i style="width:' + ((diff[k] || 0) / diffMax * 100) + '%"></i></div><span class="row-v">' + (diff[k] || 0) + '</span></div>').join('') +
+      '</div></div>' +
+      '<div class="card"><h3>勋章解锁榜</h3><div class="rows">' +
+      (ach.length ? ach.map(x => '<div class="row"><span class="row-l">' + esc(x.icon) + ' ' + esc(x.name) + '</span><div class="row-bar"><i style="width:' + (x.count / achMax * 100) + '%"></i></div><span class="row-v">' + x.count + '</span></div>').join('') : '<div class="loading">暂无解锁</div>') +
+      '</div></div>' +
+      '</div>';
   } catch (e) {
     c.innerHTML = '<div class="loading">加载失败：' + e.message + '</div>';
   }
