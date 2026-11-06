@@ -264,6 +264,19 @@ main{display:grid;grid-template-columns:230px minmax(330px,540px) 1fr;gap:40px;a
 .lc-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--green),var(--gold));border-radius:6px;transition:width .3s}
 .lc-meta{margin-top:6px;font-size:11px;color:var(--muted);text-align:right}
 
+/* ===== 今日挑战卡片（阶段七） ===== */
+.daily-card{border:1px solid var(--line);background:linear-gradient(160deg,var(--card),var(--card));border-radius:12px;padding:14px 16px;margin-bottom:16px;position:relative;overflow:hidden}
+.daily-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--green),var(--gold))}
+.daily-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.daily-title{font-size:13px;font-weight:700;color:var(--ink)}
+.daily-date{font-size:11px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.daily-badge{font-size:10px;font-weight:650;color:var(--muted);border:1px solid var(--line);background:var(--card);border-radius:20px;padding:3px 10px;white-space:nowrap}
+.daily-badge.done{color:var(--green);border-color:var(--green);background:color-mix(in srgb,var(--green) 10%,transparent)}
+.daily-streak{font-size:12px;color:var(--ink);margin:10px 0 12px;font-weight:600}
+.daily-btn{width:100%;border:0;border-radius:10px;padding:10px;font-size:13px;font-weight:650;cursor:pointer;background:linear-gradient(90deg,var(--green),var(--gold));color:var(--card);transition:.15s}
+.daily-btn:hover{filter:brightness(1.05);transform:translateY(-1px)}
+.daily-btn:active{transform:translateY(0)}
+
 /* ===== 勋章墙（阶段四） ===== */
 .ach-head{display:flex;justify-content:space-between;align-items:center;margin:0 0 10px}
 .ach-head h3{font-size:13px;font-weight:600;margin:0}

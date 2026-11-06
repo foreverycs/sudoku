@@ -62,3 +62,14 @@ CREATE TABLE IF NOT EXISTS user_achievements (
   CONSTRAINT fk_ua_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_ua_ach  FOREIGN KEY (achievement_id) REFERENCES achievements(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 每日挑战完成记录（每天每用户一条）
+CREATE TABLE IF NOT EXISTS daily_records (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id    INT UNSIGNED NOT NULL,
+  date       DATE NOT NULL,
+  seconds    INT UNSIGNED NOT NULL DEFAULT 0,
+  solved_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_user_date (user_id, date),
+  CONSTRAINT fk_daily_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -88,3 +88,24 @@ function user_pub($uid) {
     $r = $st->fetch();
     return $r ? $r : [];
 }
+
+/** 每日挑战连胜：连续完成每日挑战的天数（从今天或昨天往前连续计数） */
+function daily_streak($uid) {
+    $st = db()->prepare('SELECT date FROM daily_records WHERE user_id = ? ORDER BY date DESC');
+    $st->execute([(int)$uid]);
+    $rows = $st->fetchAll();
+    if (!$rows) return 0;
+    $today = date('Y-m-d');
+    $yest  = date('Y-m-d', strtotime('-1 day'));
+    $first = $rows[0]['date'];
+    if ($first !== $today && $first !== $yest) return 0; // 断档：最近一次完成不在今天/昨天
+    $streak = 0;
+    $cursor = $first;
+    foreach ($rows as $r) {
+        if ($r['date'] === $cursor) {
+            $streak++;
+            $cursor = date('Y-m-d', strtotime($cursor . ' -1 day'));
+        }
+    }
+    return $streak;
+}

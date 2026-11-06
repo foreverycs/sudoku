@@ -29,14 +29,14 @@ function user_stats($uid) {
     );
 }
 
-/** 勋章条件判定（daily_streak_ge 需登录日志表，暂不判定） */
-function achievement_met($condType, $condValue, $stats) {
+/** 勋章条件判定（daily_streak_ge 依据每日挑战连胜） */
+function achievement_met($condType, $condValue, $stats, $uid) {
     switch ($condType) {
         case 'complete_count':   return $stats['complete_count'] >= (int)$condValue;
         case 'best_seconds_lt':  return $stats['best_min'] > 0 && $stats['best_min'] < (int)$condValue;
         case 'total_seconds_ge': return $stats['total_seconds'] >= (int)$condValue;
         case 'level_ge':         return $stats['max_level'] >= (int)$condValue;
-        case 'daily_streak_ge':  return false;
+        case 'daily_streak_ge':  return daily_streak($uid) >= (int)$condValue;
     }
     return false;
 }
@@ -76,7 +76,7 @@ function game_complete() {
     $newAch = array();
     foreach ($st->fetchAll() as $a) {
         if ($a['unlocked']) continue;
-        if (achievement_met($a['cond_type'], $a['cond_value'], $stats)) {
+        if (achievement_met($a['cond_type'], $a['cond_value'], $stats, $uid)) {
             $pdo->prepare('INSERT IGNORE INTO user_achievements (user_id, achievement_id) VALUES (?,?)')->execute([$uid, $a['id']]);
             $expGain += (int)$a['points'];
             $newAch[] = array(
@@ -127,7 +127,7 @@ function achievements_list() {
             case 'best_seconds_lt':  $pv = $stats['best_min'];       break;
             case 'total_seconds_ge': $pv = $stats['total_seconds'];  break;
             case 'level_ge':         $pv = $stats['max_level'];      break;
-            case 'daily_streak_ge':  $pv = 0;                        break;
+            case 'daily_streak_ge':  $pv = daily_streak($c['uid']);  break;
         }
         $r['progress'] = (int)$pv;
     }

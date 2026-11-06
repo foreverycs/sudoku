@@ -13,6 +13,7 @@ require_once __DIR__ . '/resp.php';
 require_once __DIR__ . '/handlers/auth.php';
 require_once __DIR__ . '/handlers/progress.php';
 require_once __DIR__ . '/handlers/game.php';
+require_once __DIR__ . '/handlers/daily.php';
 require_once __DIR__ . '/handlers/admin.php';
 
 // CORS
@@ -40,6 +41,8 @@ try {
     if ($method === 'GET'  && $r === 'achievements')  return achievements_list();
     if ($method === 'GET'  && $r === 'me/stats')      return me_stats();
     if ($method === 'GET'  && $r === 'leaderboard')   return leaderboard();
+    if ($method === 'GET'  && $r === 'daily')         return daily_get();
+    if ($method === 'POST' && $r === 'daily/complete') return daily_complete();
     // 后台管理（阶段五）
     if ($method === 'GET'  && $r === 'admin/overview')        return admin_overview();
     if ($method === 'GET'  && $r === 'admin/users')           return admin_users();

@@ -25,6 +25,11 @@
   let board = [], given = [], notes = [], selected = -1, noteMode = false, history = [], seconds = 0, timerId = null, sayTimer = null, playAcc = 0, playStart = 0;
   let solution = [];
 
+  // ===== 每日挑战（dailyMode 复用棋盘，不写 saved.boards / 不占 completed） =====
+  const DAILY_KEY = 'quiet-sudoku-daily';
+  const dailyStore = { read() { try { return JSON.parse(localStorage.getItem(DAILY_KEY) || '{}'); } catch { return {}; } }, write(d) { try { localStorage.setItem(DAILY_KEY, JSON.stringify(d)); } catch { /* 禁用时不保存 */ } } };
+  let dailyMode = false, dailyData = null, dailyDone = false, dailySavedDate = '';
+
   const $ = id => document.getElementById(id);
   const boardEl = $('board');
 
@@ -59,6 +64,7 @@
     store.write({ unlocked, completed: [...completed], level, boards: saved.boards || {}, challenge, best });
   }
   function saveGame() {
+    if (dailyMode) { saveDailyLocal(); return; }
     saved.boards = saved.boards || {};
     saved.boards[level] = { cells: board.slice(), notes: notes.map(s => [...s]), seconds, ts: Date.now() };
     persist();
@@ -66,6 +72,10 @@
   }
 
   function loadLevel(l) {
+    dailyMode = false; dailyData = null; dailyDone = false; dailySavedDate = '';
+    $('modal-title').textContent = '恭喜完成本关！';
+    $('modal-replay').style.display = '';
+    $('modal-next').textContent = '下一关 ›';
     level = clamp(l, 1, N);
     const d = DATA[level - 1];
     const clue = d ? d.c.split('').map(Number) : [];
@@ -112,9 +122,15 @@
   }
 
   function render() {
-    $('level-top').textContent = String(level).padStart(2, '0');
-    $('title').textContent = labels[Math.min(9, Math.floor((level - 1) / 10))];
-    $('difficulty').textContent = difficulty(level);
+    if (dailyMode && dailyData) {
+      $('level-top').textContent = '每日';
+      $('title').textContent = '今日挑战';
+      $('difficulty').textContent = '每日一题';
+    } else {
+      $('level-top').textContent = String(level).padStart(2, '0');
+      $('title').textContent = labels[Math.min(9, Math.floor((level - 1) / 10))];
+      $('difficulty').textContent = difficulty(level);
+    }
     $('completed').textContent = completed.size;
     $('progress-text').textContent = completed.size + ' / ' + N;
     $('progress-bar').style.width = completed.size + '%';
@@ -258,6 +274,7 @@
   }
 
   function win() {
+    if (dailyMode) { dailyWin(); return; }
     updateTimer();
     completed.add(level);
     unlocked = Math.max(unlocked, Math.min(N, level + 1));
@@ -318,6 +335,7 @@
     if (h) { board = h.board; notes = h.notes; saveGame(); render(); } else say('暂无可撤销操作');
   };
   $('restart').onclick = () => {
+    if (dailyMode) { dailyStore.write({}); loadDaily(); say('今日挑战已重新开始'); return; }
     if (saved.boards) delete saved.boards[level];
     clearInterval(timerId); timerId = null; playAcc = 0; playStart = 0;
     loadLevel(level);
@@ -333,6 +351,7 @@
     saveGame(); render(); say('已填入一个正确数字');
   };
   $('continue').onclick = () => loadLevel(level);
+  $('daily-btn').onclick = () => loadDaily();
 
   // 挑战模式开关
   const chk = $('challenge');
@@ -343,8 +362,8 @@
 
   // 弹窗按钮
   const overlay = $('overlay');
-  $('modal-next').onclick = () => { overlay.classList.remove('show'); if (level < N) loadLevel(level + 1); else say('已是最后一关'); };
-  $('modal-replay').onclick = () => { overlay.classList.remove('show'); if (saved.boards) delete saved.boards[level]; loadLevel(level); };
+  $('modal-next').onclick = () => { overlay.classList.remove('show'); if (dailyMode) { loadLevel(level); return; } if (level < N) loadLevel(level + 1); else say('已是最后一关'); };
+  $('modal-replay').onclick = () => { overlay.classList.remove('show'); if (dailyMode) { loadLevel(level); return; } if (saved.boards) delete saved.boards[level]; loadLevel(level); };
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('show'); });
 
   // 键盘
@@ -531,6 +550,108 @@
     }
   }
 
+  // ===== 每日挑战（阶段七） =====
+  function saveDailyLocal() {
+    if (!dailyMode || !dailySavedDate) return;
+    const ls = dailyStore.read();
+    ls.date = dailySavedDate;
+    ls.board = board.slice();
+    ls.notes = notes.map(s => [...s]);
+    ls.seconds = seconds;
+    dailyStore.write(ls);
+  }
+
+  function updateDailyCard() {
+    const badge = $('daily-badge'), dateEl = $('daily-date'), streakEl = $('daily-streak'), btn = $('daily-btn');
+    if (!dailyData) return;
+    if (dateEl) dateEl.textContent = dailyData.date;
+    const solved = !!(dailyData.solved || dailyDone);
+    if (badge) { badge.textContent = solved ? '已完成' : '未完成'; badge.classList.toggle('done', solved); }
+    if (btn) btn.textContent = solved ? '今日已完成 · 重玩不计分' : '开始今日挑战';
+    if (streakEl) streakEl.textContent = '🔥 连胜 ' + (dailyData.streak || 0) + ' 天';
+  }
+
+  // 轻量拉取：仅刷新侧边栏卡片状态（不进棋盘）
+  async function loadDailyCard() {
+    if (!currentUser) return;
+    try {
+      dailyData = await apiCall('daily', 'GET');
+      dailyDone = !!dailyData.solved;
+      updateDailyCard();
+    } catch (e) { /* 网络忽略，卡片保持默认 */ }
+  }
+
+  // 进入今日挑战：复用棋盘，题面来自每日接口，不写 saved.boards
+  async function loadDaily() {
+    if (!currentUser) { say('请先登录后参加今日挑战'); openAuth('login'); return; }
+    try {
+      const d = await apiCall('daily', 'GET');
+      dailyData = d;
+      dailyMode = true;
+      dailyDone = !!d.solved;
+      dailySavedDate = d.date;
+      solution = (d.answer || '').split('').map(Number);
+      const clue = (d.cells || '').split('').map(Number);
+      given = clue.map(x => x > 0);
+      const ls = dailyStore.read();
+      const sd = (ls && ls.date === d.date && Array.isArray(ls.board) && ls.board.length === 81) ? ls : null;
+      board = sd ? sd.board.slice() : clue.slice();
+      notes = Array.from({ length: 81 }, (_, i) => new Set(sd && Array.isArray(sd.notes && sd.notes[i]) ? sd.notes[i].filter(x => x >= 1 && x <= 9) : []));
+      seconds = Math.min(1e5, Math.max(0, (sd && sd.seconds) | 0));
+      history = []; selected = -1; noteMode = false;
+      $('notes').classList.remove('active');
+      playAcc = seconds * 1000; playStart = 0;
+      updateTimer();
+      render();
+      updateDailyCard();
+      if (d.solved) say('今日挑战已完成，用时 ' + fmt(d.solved.seconds));
+      else say('今日挑战：每天全球同题，完成后计经验');
+    } catch (e) {
+      say('今日挑战加载失败：' + (e.message || '网络异常'));
+    }
+  }
+
+  async function dailyWin() {
+    updateTimer();
+    const t = seconds;
+    dailyDone = true;
+    saveDailyLocal();
+    clearInterval(timerId); timerId = null; playStart = 0; // 完成停表
+    $('modal-title').textContent = '今日挑战完成！';
+    $('modal-replay').style.display = 'none';
+    $('modal-next').textContent = '返回闯关 ›';
+    $('modal-time').textContent = fmt(t);
+    $('modal-best').textContent = '每日限定';
+    $('modal-record').style.display = 'none';
+    $('modal-gain').style.display = 'none';
+    $('overlay').classList.add('show');
+    render();
+    updateDailyCard();
+    if (currentUser) settleDaily(t);
+  }
+
+  async function settleDaily(seconds) {
+    try {
+      const d = await apiCall('daily/complete', 'POST', { seconds });
+      if (currentUser) {
+        currentUser.exp = d.exp;
+        currentUser.level = d.level;
+        currentUser.expNext = d.expNext;
+        currentUser.levelExp = d.levelExp;
+        updateUserUI();
+        renderLevelCard(currentUser);
+      }
+      renderModalGain({ expGain: d.expGain, first: d.firstToday, newAchievements: d.newAchievements });
+      if (d.newAchievements && d.newAchievements.length) {
+        d.newAchievements.forEach(a => toast('🏅 解锁勋章：' + a.name));
+      }
+      if (d.levelUp) toast('🎉 升级到 Lv.' + d.level + '！');
+      if (d.streak != null && dailyData) dailyData.streak = d.streak;
+      loadAchievements();
+      loadDailyCard();
+    } catch (e) { /* 结算失败不影响本地完成 */ }
+  }
+
   function renderModalGain(d) {
     const el = $('modal-gain');
     if (!d || !d.expGain) { el.style.display = 'none'; return; }
@@ -667,6 +788,7 @@
       updateUserUI();
       renderLevelCard(currentUser);
       loadAchievements();
+      loadDailyCard();
       const changed = await syncProgress();
       if (changed) loadLevel(level);
     } catch (err) {
@@ -701,6 +823,7 @@
         renderLevelCard(currentUser);
         loadAchievements();
         loadLeaderboard();
+        loadDailyCard();
         say('欢迎回来，' + (currentUser.nickname || currentUser.username));
         const changed = await syncProgress();
         if (changed) loadLevel(level);
@@ -728,6 +851,7 @@
         renderLevelCard(currentUser);
         loadAchievements();
         loadLeaderboard();
+        loadDailyCard();
         say('注册成功，欢迎加入！');
         const changed = await syncProgress();
         if (changed) loadLevel(level);

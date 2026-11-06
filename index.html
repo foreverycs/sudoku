@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#f5f6f3">
 <title>数独 · 静心一刻</title>
-<link rel="stylesheet" href="sudoku.css?v=19">
+<link rel="stylesheet" href="sudoku.css?v=21">
 </head>
 <body>
 <div class="shell">
@@ -38,6 +38,14 @@
   <div class="message" id="message"></div>
 </section>
 <aside class="side">
+  <div class="daily-card" id="daily-card">
+    <div class="daily-head">
+      <div><div class="daily-title">📅 今日挑战</div><div class="daily-date" id="daily-date"></div></div>
+      <span class="daily-badge" id="daily-badge">未完成</span>
+    </div>
+    <div class="daily-streak" id="daily-streak">连胜 0 天</div>
+    <button class="daily-btn" id="daily-btn" type="button">开始今日挑战</button>
+  </div>
   <h3>你的进度</h3>
   <p class="side-intro">一点点练习，也是在前进。</p>
   <div class="level-card" id="level-card" style="display:none">
@@ -62,7 +70,7 @@
 <div class="overlay" id="overlay">
   <div class="modal">
     <div class="trophy">🏆</div>
-    <h3>恭喜完成本关！</h3>
+    <h3 id="modal-title">恭喜完成本关！</h3>
     <p class="sub" id="modal-record" style="display:none">🎉 新纪录！</p>
     <div class="modal-stats">
       <div><span>本关用时</span><strong id="modal-time">00:00</strong></div>
@@ -100,6 +108,6 @@
 </div>
 <div class="toasts" id="toasts"></div>
 <script src="sudoku-data.js?v=17"></script>
-<script src="sudoku.js?v=20"></script>
+<script src="sudoku.js?v=21"></script>
 </body>
 </html>
