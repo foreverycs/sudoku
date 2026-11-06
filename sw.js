@@ -1,12 +1,12 @@
 /* Service Worker —— 数独 · 静心一刻（PWA 离线缓存）
  * 缓存应用外壳：首屏资源离线可用；API 不缓存（动态数据），断网时游戏核心本地可玩。
  */
-const CACHE = 'sudoku-shell-v5';
+const CACHE = 'sudoku-shell-v7';
 const ASSETS = [
   '/',
   '/index.html',
   '/sudoku.css?v=26',
-  '/sudoku.js?v=26',
+  '/sudoku.js?v=28',
   '/sudoku-data.js?v=17',
   '/manifest.json',
   '/icons/icon-192.png',

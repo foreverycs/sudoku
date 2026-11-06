@@ -406,7 +406,7 @@
   });
   window.addEventListener('pagehide', saveGame);
 
-  // 深浅色主题
+  // 深浅色主题：三态循环 跟随系统(auto) → 浅色(light) → 深色(dark)
   const THEME_KEY = 'quiet-sudoku-theme';
   const mqDark = window.matchMedia('(prefers-color-scheme: dark)');
   const themeBtn = $('theme');
@@ -414,25 +414,27 @@
   const themeGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
   const themeSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* 仅不持久化，本次仍可切换 */ } };
   function applyTheme() {
-    const saved = themeGet(THEME_KEY);
-    const dark = saved ? saved === 'dark' : mqDark.matches;
+    const mode = themeGet(THEME_KEY) || 'auto'; // 默认跟随系统
+    const dark = mode === 'auto' ? mqDark.matches : mode === 'dark';
     document.documentElement.classList.toggle('dark', dark);
-    document.documentElement.classList.toggle('light', saved === 'light');
+    document.documentElement.classList.toggle('light', !dark);
     if (themeBtn) {
-      themeBtn.textContent = dark ? '☀️' : '🌙';
+      themeBtn.textContent = mode === 'auto' ? '🌗' : (mode === 'dark' ? '🌙' : '☀️');
       themeBtn.setAttribute('aria-pressed', dark);
+      themeBtn.title = mode === 'auto' ? '主题：跟随系统' : (mode === 'dark' ? '主题：深色' : '主题：浅色');
     }
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', dark ? '#1c211d' : '#f5f6f3');
   }
   if (themeBtn) {
     themeBtn.onclick = () => {
-      const cur = themeGet(THEME_KEY);
-      const next = cur ? (cur === 'dark' ? 'light' : 'dark') : (mqDark.matches ? 'light' : 'dark');
+      const cur = themeGet(THEME_KEY) || 'auto';
+      const next = cur === 'auto' ? 'light' : (cur === 'light' ? 'dark' : 'auto');
       themeSet(THEME_KEY, next);
       applyTheme();
+      say(next === 'auto' ? '🌗 主题：跟随系统' : (next === 'dark' ? '🌙 主题：深色' : '☀️ 主题：浅色'));
     };
-    const onSchemeChange = () => { if (!themeGet(THEME_KEY)) applyTheme(); };
+    const onSchemeChange = () => { const m = themeGet(THEME_KEY) || 'auto'; if (m === 'auto') applyTheme(); };
     if (mqDark.addEventListener) mqDark.addEventListener('change', onSchemeChange);
     else if (mqDark.addListener) mqDark.addListener(onSchemeChange); // 旧 iOS Safari 兼容
   }
