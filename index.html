@@ -11,11 +11,11 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>数独 · 静心一刻</title>
-<link rel="stylesheet" href="sudoku.css?v=23">
+<link rel="stylesheet" href="sudoku.css?v=24">
 </head>
 <body>
 <div class="shell">
-<header class="top"><div class="brand"><div class="mark">▦</div><div><h1>数独</h1><small>静心一刻 · DAILY PUZZLE</small></div></div><div class="top-right"><span class="top-note">一格一数，慢慢来就好</span><div class="user-area"><button class="login-btn" id="login-btn">登录 / 注册</button><button class="user-chip" id="user-chip" style="display:none"><span class="avatar" id="avatar"></span><span class="uname" id="uname"></span><span class="ucaret">▾</span></button><div class="user-menu" id="user-menu" style="display:none"><div class="um-head"><strong id="um-nick"></strong><span id="um-username"></span></div><div class="um-exp"><span>Lv.<b id="um-level">1</b></span><span id="um-exp-text">0/100</span></div><button class="um-btn" id="logout-btn">退出登录</button></div></div><button class="theme-btn" id="theme" aria-label="切换深浅色主题">🌙</button></div></header>
+<header class="top"><div class="brand"><div class="mark">▦</div><div><h1>数独</h1><small>静心一刻 · DAILY PUZZLE</small></div></div><div class="top-right"><span class="top-note">一格一数，慢慢来就好</span><div class="user-area"><button class="login-btn" id="login-btn">登录 / 注册</button><button class="user-chip" id="user-chip" style="display:none"><span class="avatar" id="avatar"></span><span class="uname" id="uname"></span><span class="ucaret">›</span></button></div><button class="theme-btn" id="theme" aria-label="切换深浅色主题">🌙</button></div></header>
 <main>
 <aside class="leader">
   <h3>排行榜</h3>
@@ -103,6 +103,44 @@
     </div>
   </div>
 </div>
+<!-- 个人主页 -->
+<div class="overlay" id="profile-overlay">
+  <div class="modal profile-modal">
+    <button class="auth-close" id="profile-close" aria-label="关闭">✕</button>
+    <div class="pf-head">
+      <button class="pf-avatar" id="pf-avatar" title="点击更换头像"></button>
+      <div class="pf-id">
+        <strong id="pf-nick"></strong>
+        <span id="pf-username"></span>
+      </div>
+      <span class="pf-level" id="pf-level">Lv.1</span>
+    </div>
+    <div class="pf-exp"><div class="pf-exp-bar"><i id="pf-exp-fill"></i></div><span id="pf-exp-text">0/100</span></div>
+    <div class="pf-stats">
+      <div><b id="pf-completed">0</b><span>完成关卡</span></div>
+      <div><b id="pf-total">00:00</b><span>总用时</span></div>
+      <div><b id="pf-best">--</b><span>最佳单关</span></div>
+      <div><b id="pf-max">0</b><span>最高关卡</span></div>
+    </div>
+    <div class="pf-daily">
+      <span id="pf-daily-txt">今日挑战：未完成</span>
+      <span id="pf-streak">连胜 0 天</span>
+    </div>
+    <h4 class="pf-sec">勋章 <em id="pf-ach-count">0/11</em></h4>
+    <div class="pf-ach" id="pf-ach"></div>
+    <h4 class="pf-sec">最近成绩</h4>
+    <div class="pf-recent" id="pf-recent"></div>
+    <button class="modal-btn ghost pf-logout" id="profile-logout">退出登录</button>
+  </div>
+</div>
+<!-- 头像选择 -->
+<div class="overlay" id="avatar-overlay">
+  <div class="modal avatar-modal">
+    <button class="auth-close" id="avatar-close" aria-label="关闭">✕</button>
+    <h3>选择头像</h3>
+    <div class="avatar-grid" id="avatar-grid"></div>
+  </div>
+</div>
 <!-- 登录/注册弹窗 -->
 <div class="overlay" id="auth-overlay">
   <div class="modal auth-modal">
@@ -128,6 +166,6 @@
 </div>
 <div class="toasts" id="toasts"></div>
 <script src="sudoku-data.js?v=17"></script>
-<script src="sudoku.js?v=23"></script>
+<script src="sudoku.js?v=24"></script>
 </body>
 </html>

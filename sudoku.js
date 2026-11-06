@@ -531,9 +531,7 @@
       const uid = currentUser ? currentUser.id : -1;
       const rowHtml = (u, i, extraTag) => {
         const me = u.id === uid;
-        const ava = u.avatar
-          ? '<img src="' + u.avatar + '" alt="">'
-          : (u.nickname || u.username || '?').charAt(0).toUpperCase();
+        const ava = avatarHtml(u);
         return '<div class="lb-row' + (me ? ' me' : '') + '">'
           + '<span class="lb-rank">' + (i + 1) + '</span>'
           + '<span class="lb-ava">' + ava + '</span>'
@@ -820,23 +818,116 @@
     }, 800);
   }
 
+  // ===== 个人主页 + 头像（阶段④） =====
+  const AVATARS = ['🦊','🐱','🐼','🐸','🦁','🐯','🐰','🦉','🐨','🐶','🦄','🐙','🌿','⭐','🔥','🌈'];
+
+  // 统一头像渲染：URL 用 <img>，emoji/短文本用文本，否则首字母
+  function avatarHtml(u) {
+    const a = u && u.avatar;
+    if (a) {
+      if (/^(https?:|data:image)/i.test(a)) return '<img src="' + esc(a) + '" alt="">';
+      return '<span class="ava-emoji">' + esc(a) + '</span>';
+    }
+    return '<span class="ava-letter">' + esc((u.nickname || u.username || '?').charAt(0).toUpperCase()) + '</span>';
+  }
+
+  let profileData = null;
+
+  async function openProfile() {
+    if (!currentUser) return;
+    $('profile-overlay').classList.add('show');
+    try {
+      const d = await apiCall('profile', 'GET');
+      profileData = d;
+      renderProfile(d);
+    } catch (e) { say('加载主页失败：' + e.message); }
+  }
+  function closeProfile() { $('profile-overlay').classList.remove('show'); }
+
+  function renderProfile(d) {
+    const u = d.user;
+    $('pf-avatar').innerHTML = avatarHtml(u);
+    $('pf-nick').textContent = u.nickname || u.username;
+    $('pf-username').textContent = '@' + (u.username || '');
+    $('pf-level').textContent = 'Lv.' + (u.level || 1);
+    const need = d.expNext || 100, into = d.levelExp || 0;
+    $('pf-exp-fill').style.width = Math.min(100, Math.round(into / need * 100)) + '%';
+    $('pf-exp-text').textContent = into + ' / ' + need;
+    const s = d.stats || {};
+    $('pf-completed').textContent = s.complete_count || 0;
+    $('pf-total').textContent = fmtClock(s.total_seconds || 0);
+    $('pf-best').textContent = s.best_min ? fmtClock(s.best_min) : '--';
+    $('pf-max').textContent = s.max_level || 0;
+    const dl = d.daily || {};
+    $('pf-daily-txt').textContent = '今日挑战：' + (dl.todayDone ? '✅ 已完成' : '未完成');
+    $('pf-streak').textContent = '连胜 ' + (dl.streak || 0) + ' 天';
+    const ach = d.achievements || [];
+    $('pf-ach-count').textContent = ach.length + '/' + (d.achievementTotal || ach.length);
+    $('pf-ach').innerHTML = ach.length ? ach.map(a =>
+      '<div class="pf-ach-item" title="' + esc(a.description || '') + '">'
+      + '<span class="pf-ach-icon">' + esc(a.icon || '🏅') + '</span>'
+      + '<span class="pf-ach-name">' + esc(a.name || '') + '</span></div>').join('')
+      : '<span class="pf-empty">暂无勋章，完成关卡解锁成就</span>';
+    const rec = d.recent || [];
+    $('pf-recent').innerHTML = rec.length ? rec.map(r =>
+      '<div class="pf-rec"><span class="pf-rec-lv">第' + r.level + '关</span>'
+      + '<span class="pf-rec-time">' + fmtClock(r.seconds) + '</span>'
+      + (r.is_record ? '<span class="pf-rec-badge">纪录</span>' : '')
+      + '</div>').join('')
+      : '<span class="pf-empty">暂无完成记录</span>';
+  }
+
+  function openAvatarPicker() {
+    $('avatar-grid').innerHTML = AVATARS.map(a =>
+      '<button class="avatar-opt" data-ava="' + a + '" type="button">' + a + '</button>').join('');
+    $('avatar-overlay').classList.add('show');
+  }
+
+  async function pickAvatar(ava) {
+    try {
+      const d = await apiCall('me/avatar', 'PUT', { avatar: ava });
+      if (d.user) {
+        currentUser.avatar = d.user.avatar;
+        if (profileData) profileData.user = d.user;
+      }
+      $('avatar-overlay').classList.remove('show');
+      updateUserUI();
+      loadLeaderboard();
+      if ($('profile-overlay').classList.contains('show') && profileData) renderProfile(profileData);
+      toast('头像已更新');
+    } catch (e) { say('头像更新失败：' + e.message); }
+  }
+
+  function bindProfile() {
+    $('user-chip').onclick = e => { e.stopPropagation(); openProfile(); };
+    $('profile-close').onclick = closeProfile;
+    $('profile-overlay').addEventListener('click', e => { if (e.target === $('profile-overlay')) closeProfile(); });
+    $('pf-avatar').onclick = openAvatarPicker;
+    $('avatar-close').onclick = () => $('avatar-overlay').classList.remove('show');
+    $('avatar-overlay').addEventListener('click', e => { if (e.target === $('avatar-overlay')) $('avatar-overlay').classList.remove('show'); });
+    $('avatar-grid').onclick = e => {
+      const btn = e.target.closest ? e.target.closest('.avatar-opt') : null;
+      if (btn) pickAvatar(btn.getAttribute('data-ava'));
+    };
+    $('profile-logout').onclick = () => {
+      tokenSet(''); currentUser = null;
+      updateUserUI(); loadLeaderboard(); closeProfile();
+      say('已退出登录，进度将仅保存在本地');
+    };
+  }
+
   function updateUserUI() {
-    const loginBtn = $('login-btn'), chip = $('user-chip'), menu = $('user-menu');
+    const loginBtn = $('login-btn'), chip = $('user-chip');
     if (currentUser) {
       loginBtn.style.display = 'none';
       chip.style.display = 'inline-flex';
       const name = currentUser.nickname || currentUser.username || '?';
-      $('avatar').textContent = name.charAt(0).toUpperCase();
+      $('avatar').innerHTML = avatarHtml(currentUser);
       $('uname').textContent = name;
-      $('um-nick').textContent = name;
-      $('um-username').textContent = '@' + (currentUser.username || '');
-      $('um-level').textContent = currentUser.level || 1;
-      $('um-exp-text').textContent = (currentUser.exp || 0) + ' / ' + (currentUser.expNext || 100);
       $('foot').textContent = '已开启云端同步，闯关进度会自动备份到账号。';
     } else {
       loginBtn.style.display = '';
       chip.style.display = 'none';
-      if (menu) menu.style.display = 'none';
       $('foot').textContent = '你的进度仅保存在此设备的浏览器中。';
       renderLevelCard(null);
       renderAchievements([]);
@@ -981,21 +1072,7 @@
       } finally { btn.disabled = false; }
     });
 
-    $('user-chip').onclick = e => {
-      e.stopPropagation();
-      const m = $('user-menu');
-      m.style.display = (m.style.display === 'none' || !m.style.display) ? 'block' : 'none';
-    };
-    document.addEventListener('click', e => {
-      const m = $('user-menu');
-      if (m && m.style.display === 'block' && !m.contains(e.target) && !$('user-chip').contains(e.target)) m.style.display = 'none';
-    });
-    $('logout-btn').onclick = () => {
-      tokenSet(''); currentUser = null;
-      updateUserUI();
-      loadLeaderboard();
-      say('已退出登录，进度将仅保存在本地');
-    };
+    $('user-chip').onclick = e => { e.stopPropagation(); openProfile(); };
     // 弹窗 Escape 关闭
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && $('auth-overlay').classList.contains('show')) closeAuth();
@@ -1004,6 +1081,7 @@
 
   bindAuth();
   bindShare();
+  bindProfile();
   initAuth();
   loadLeaderboard();
   loadLevel(level);

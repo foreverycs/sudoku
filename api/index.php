@@ -14,6 +14,7 @@ require_once __DIR__ . '/handlers/auth.php';
 require_once __DIR__ . '/handlers/progress.php';
 require_once __DIR__ . '/handlers/game.php';
 require_once __DIR__ . '/handlers/daily.php';
+require_once __DIR__ . '/handlers/profile.php';
 require_once __DIR__ . '/handlers/admin.php';
 
 // CORS
@@ -40,6 +41,8 @@ try {
     if ($method === 'POST' && $r === 'game/complete') return game_complete();
     if ($method === 'GET'  && $r === 'achievements')  return achievements_list();
     if ($method === 'GET'  && $r === 'me/stats')      return me_stats();
+    if ($method === 'GET'  && $r === 'profile')       return profile_get();
+    if ($method === 'PUT'  && $r === 'me/avatar')     return me_avatar_put();
     if ($method === 'GET'  && $r === 'leaderboard')   return leaderboard();
     if ($method === 'GET'  && $r === 'daily')         return daily_get();
     if ($method === 'POST' && $r === 'daily/complete') return daily_complete();

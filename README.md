@@ -21,6 +21,7 @@
 
 ### 账号与进阶
 - 👤 **注册 / 登录**（JWT 认证，Bearer Token）
+- 🧑 **个人主页 + 头像**：点击右上角头像打开个人主页（等级/经验/统计/勋章墙/最近成绩），可换 16 款 emoji 头像（云端同步，排行榜同步显示）
 - ☁️ **云端进度同步**：登录后自动上传/拉取各关进度与最佳成绩
 - 🏅 **经验等级**：完成关卡获得经验，`exp_needed(level)=100+(level-1)*50`，升级弹提示
 - 🎖 **勋章成就**：11 枚勋章（完成数、极速、时长、高难度、连续 7 天完成每日挑战），解锁加经验
@@ -107,7 +108,7 @@ sudoku/
 │   ├── install.php       # 首次初始化（建表 + 管理员 + 勋章种子）
 │   ├── schema.sql        # 数据库结构
 │   ├── .htaccess         # Apache 路径式重写
-│   └── handlers/         # auth.php / progress.php / game.php / admin.php
+│   └── handlers/         # auth.php / progress.php / game.php / daily.php / profile.php / admin.php
 ├── docs/UPGRADE_PLAN.md  # 升级规划（阶段一~五）
 └── README.md             # 本文档
 ```
@@ -137,6 +138,8 @@ sudoku/
 | POST | `?r=game/complete` | 结算 `{level,seconds}` → `{expGain,level,levelUp,isRecord,newAchievements}` |
 | GET  | `?r=achievements` | 勋章列表 + 用户解锁状态 + 进度 |
 | GET  | `?r=me/stats` | 我的统计（完成数/总时长/最佳各关） |
+| GET  | `?r=profile` | 个人主页聚合（用户/统计/各关最佳/最近成绩/每日/勋章） |
+| PUT  | `?r=me/avatar` | 设置头像 `{avatar}`（emoji 或图片 URL，≤64 字符） |
 | GET  | `?r=leaderboard&level=X` | 某关卡时间榜（该关最佳用时，用时短靠前） |
 | GET  | `?r=daily` | 今日挑战（题面+完成状态+连胜+近60天记录） |
 | POST | `?r=daily/complete` | 每日完成结算 `{seconds}` → `{expGain,streak,firstToday}` |
