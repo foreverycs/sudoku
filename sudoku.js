@@ -29,6 +29,7 @@
   const DAILY_KEY = 'quiet-sudoku-daily';
   const dailyStore = { read() { try { return JSON.parse(localStorage.getItem(DAILY_KEY) || '{}'); } catch { return {}; } }, write(d) { try { localStorage.setItem(DAILY_KEY, JSON.stringify(d)); } catch { /* 禁用时不保存 */ } } };
   let dailyMode = false, dailyData = null, dailyDone = false, dailySavedDate = '';
+  let quickMode = false;
 
   const $ = id => document.getElementById(id);
   const boardEl = $('board');
@@ -64,6 +65,7 @@
     store.write({ unlocked, completed: [...completed], level, boards: saved.boards || {}, challenge, best });
   }
   function saveGame() {
+    if (quickMode) return;
     if (dailyMode) { saveDailyLocal(); return; }
     saved.boards = saved.boards || {};
     saved.boards[level] = { cells: board.slice(), notes: notes.map(s => [...s]), seconds, ts: Date.now() };
@@ -73,6 +75,7 @@
 
   function loadLevel(l) {
     dailyMode = false; dailyData = null; dailyDone = false; dailySavedDate = '';
+    quickMode = false;
     $('modal-title').textContent = '恭喜完成本关！';
     $('modal-replay').style.display = '';
     $('modal-share').style.display = 'none';
@@ -123,7 +126,11 @@
   }
 
   function render() {
-    if (dailyMode && dailyData) {
+    if (quickMode) {
+      $('level-top').textContent = '快速';
+      $('title').textContent = '快速对局';
+      $('difficulty').textContent = '随机练习';
+    } else if (dailyMode && dailyData) {
       $('level-top').textContent = '每日';
       $('title').textContent = '今日挑战';
       $('difficulty').textContent = '每日一题';
@@ -275,6 +282,7 @@
   }
 
   function win() {
+    if (quickMode) { updateTimer(); const t = seconds; clearInterval(timerId); timerId = null; playStart = 0; quickWin(t); return; }
     if (dailyMode) { dailyWin(); return; }
     updateTimer();
     completed.add(level);
@@ -338,6 +346,7 @@
     if (h) { board = h.board; notes = h.notes; saveGame(); render(); } else say('暂无可撤销操作');
   };
   $('restart').onclick = () => {
+    if (quickMode) { startQuick(); say('已重新生成快速对局'); return; }
     if (dailyMode) { dailyStore.write({}); loadDaily(); say('今日挑战已重新开始'); return; }
     if (saved.boards) delete saved.boards[level];
     clearInterval(timerId); timerId = null; playAcc = 0; playStart = 0;
@@ -365,8 +374,8 @@
 
   // 弹窗按钮
   const overlay = $('overlay');
-  $('modal-next').onclick = () => { overlay.classList.remove('show'); if (dailyMode) { loadLevel(level); return; } if (level < N) loadLevel(level + 1); else say('已是最后一关'); };
-  $('modal-replay').onclick = () => { overlay.classList.remove('show'); if (dailyMode) { loadLevel(level); return; } if (saved.boards) delete saved.boards[level]; loadLevel(level); };
+  $('modal-next').onclick = () => { overlay.classList.remove('show'); if (quickMode) { loadLevel(level); return; } if (dailyMode) { loadLevel(level); return; } if (level < N) loadLevel(level + 1); else say('已是最后一关'); };
+  $('modal-replay').onclick = () => { overlay.classList.remove('show'); if (quickMode) { loadLevel(level); return; } if (dailyMode) { loadLevel(level); return; } if (saved.boards) delete saved.boards[level]; loadLevel(level); };
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('show'); });
 
   // 键盘
@@ -695,8 +704,8 @@
     g.fillText('一格一数，慢慢来就好', P, 98);
     g.globalAlpha = 1;
 
-    // 标题（关卡/今日挑战）
-    const title = isDaily ? '今日挑战' : ('第 ' + shareCtx.level + ' 关');
+    // 标题（关卡/今日挑战/快速对局）
+    const title = isDaily ? '今日挑战' : (shareCtx.mode === 'quick' ? '快速对局' : ('第 ' + shareCtx.level + ' 关'));
     g.font = '700 42px system-ui, sans-serif';
     g.fillText(title, P, 240);
 
@@ -730,7 +739,7 @@
   async function openShare() {
     try {
       // 关卡模式：拉当前关排名（如未上榜则显示「已完成」）
-      if (shareCtx && !shareCtx.rank && !shareCtx.isRecord && currentUser && shareCtx.mode !== 'daily') {
+      if (shareCtx && !shareCtx.rank && !shareCtx.isRecord && currentUser && shareCtx.mode !== 'daily' && shareCtx.mode !== 'quick') {
         try {
           const d = await apiCall('leaderboard&level=' + shareCtx.level + '&limit=15', 'GET');
           if (d.my && d.my.rank) shareCtx.rank = d.my.rank;
@@ -818,6 +827,114 @@
     }, 800);
   }
 
+  // ===== 快速对局（阶段⑤）：本地生成唯一解随机数独，不计入进度/经验 =====
+  function shuffleArr(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+  // 生成完整 9x9 解（随机回溯）
+  function genFullGrid() {
+    const g = Array(81).fill(0);
+    const rows = Array.from({ length: 9 }, () => Array(10).fill(0));
+    const cols = Array.from({ length: 9 }, () => Array(10).fill(0));
+    const boxes = Array.from({ length: 9 }, () => Array(10).fill(0));
+    function fill(pos) {
+      if (pos === 81) return true;
+      const r = (pos / 9) | 0, c = pos % 9, b = ((r / 3) | 0) * 3 + ((c / 3) | 0);
+      const nums = shuffleArr([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      for (let k = 0; k < 9; k++) {
+        const n = nums[k];
+        if (rows[r][n] || cols[c][n] || boxes[b][n]) continue;
+        rows[r][n] = cols[c][n] = boxes[b][n] = 1; g[pos] = n;
+        if (fill(pos + 1)) return true;
+        rows[r][n] = cols[c][n] = boxes[b][n] = 0; g[pos] = 0;
+      }
+      return false;
+    }
+    return fill(0) ? g : null;
+  }
+  // 回溯计数解（MRV 选候选最少空位，提前 >limit 停止）
+  function countSolutions(g, limit) {
+    let count = 0;
+    const grid = g.slice();
+    function solve() {
+      let best = -1, bestCands = null;
+      for (let i = 0; i < 81; i++) {
+        if (grid[i] === 0) {
+          const used = Array(10).fill(0);
+          const r = (i / 9) | 0, c = i % 9;
+          for (let k = 0; k < 9; k++) { used[grid[r * 9 + k]] = 1; used[grid[k * 9 + c]] = 1; }
+          const br = ((r / 3) | 0) * 3, bc = ((c / 3) | 0) * 3;
+          for (let dr = 0; dr < 3; dr++) for (let dc = 0; dc < 3; dc++) used[grid[(br + dr) * 9 + (bc + dc)]] = 1;
+          const cands = [];
+          for (let n = 1; n <= 9; n++) if (!used[n]) cands.push(n);
+          if (!cands.length) return; // 死路
+          if (best < 0 || cands.length < bestCands.length) { best = i; bestCands = cands; if (cands.length === 1) break; }
+        }
+      }
+      if (best < 0) { count++; return; }
+      for (let k = 0; k < bestCands.length; k++) {
+        grid[best] = bestCands[k];
+        solve();
+        grid[best] = 0;
+        if (count >= limit) return;
+      }
+    }
+    solve();
+    return count;
+  }
+  // 从完整解挖洞，保持唯一解，直到剩 targetClues 个线索
+  function makePuzzle(targetClues) {
+    const sol = genFullGrid();
+    if (!sol) return null;
+    const cells = sol.slice();
+    const order = shuffleArr(Array.from({ length: 81 }, (_, i) => i));
+    let clues = 81;
+    for (let k = 0; k < 81 && clues > targetClues; k++) {
+      const idx = order[k];
+      const backup = cells[idx];
+      cells[idx] = 0;
+      if (countSolutions(cells, 2) !== 1) cells[idx] = backup; // 恢复以保证唯一解
+      else clues--;
+    }
+    return { cells: cells.slice(), solution: sol };
+  }
+
+  function startQuick() {
+    const target = 34 + ((Math.random() * 8) | 0); // 34-41 线索（中等）
+    const p = makePuzzle(target);
+    if (!p) { say('生成快速对局失败，请重试'); return; }
+    quickMode = true; dailyMode = false; dailyData = null; dailyDone = false; dailySavedDate = '';
+    solution = p.solution.slice();
+    board = p.cells.slice();
+    given = board.map(x => x > 0);
+    notes = Array.from({ length: 81 }, () => new Set());
+    history = []; selected = -1; seconds = 0; noteMode = false;
+    $('notes').classList.remove('active');
+    $('modal-share').style.display = 'none';
+    render();
+    clearInterval(timerId); timerId = null; playAcc = 0; playStart = 0;
+    updateTimer();
+    say('⚡ 快速对局已开始（' + p.cells.filter(x => x > 0).length + ' 线索）');
+    const bd = document.querySelector('.board');
+    if (bd && bd.scrollIntoView) bd.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function quickWin(t) {
+    $('modal-title').textContent = '快速对局完成！';
+    $('modal-record').style.display = 'none';
+    $('modal-time').textContent = fmt(t);
+    $('modal-best').textContent = '--';
+    $('modal-gain').style.display = 'none';
+    shareCtx = { mode: 'quick', seconds: t, isRecord: false };
+    $('modal-share').style.display = '';
+    $('overlay').classList.add('show');
+    render();
+  }
+
   // ===== 个人主页 + 头像（阶段④） =====
   const AVATARS = ['🦊','🐱','🐼','🐸','🦁','🐯','🐰','🦉','🐨','🐶','🦄','🐙','🌿','⭐','🔥','🌈'];
 
@@ -900,6 +1017,7 @@
 
   function bindProfile() {
     $('user-chip').onclick = e => { e.stopPropagation(); openProfile(); };
+    $('quick-btn').onclick = startQuick;
     $('profile-close').onclick = closeProfile;
     $('profile-overlay').addEventListener('click', e => { if (e.target === $('profile-overlay')) closeProfile(); });
     $('pf-avatar').onclick = openAvatarPicker;

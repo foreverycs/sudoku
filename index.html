@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>数独 · 静心一刻</title>
-<link rel="stylesheet" href="sudoku.css?v=24">
+<link rel="stylesheet" href="sudoku.css?v=25">
 </head>
 <body>
 <div class="shell">
@@ -51,6 +51,12 @@
     </div>
     <div class="daily-streak" id="daily-streak">连胜 0 天</div>
     <button class="daily-btn" id="daily-btn" type="button">开始今日挑战</button>
+  </div>
+  <div class="daily-card quick-card" id="quick-card">
+    <div class="daily-head">
+      <div><div class="daily-title">⚡ 快速对局</div><div class="daily-date">随机一局，不计入进度</div></div>
+    </div>
+    <button class="daily-btn" id="quick-btn" type="button">开始快速对局</button>
   </div>
   <h3>你的进度</h3>
   <p class="side-intro">一点点练习，也是在前进。</p>
@@ -166,6 +172,6 @@
 </div>
 <div class="toasts" id="toasts"></div>
 <script src="sudoku-data.js?v=17"></script>
-<script src="sudoku.js?v=24"></script>
+<script src="sudoku.js?v=25"></script>
 </body>
 </html>
