@@ -885,4 +885,11 @@
   initAuth();
   loadLeaderboard();
   loadLevel(level);
+
+  // ===== PWA：注册 Service Worker（离线缓存，断网可玩） =====
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => { /* 不支持或失败时忽略 */ });
+    });
+  }
 })();
