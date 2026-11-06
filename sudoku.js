@@ -75,6 +75,7 @@
     dailyMode = false; dailyData = null; dailyDone = false; dailySavedDate = '';
     $('modal-title').textContent = '恭喜完成本关！';
     $('modal-replay').style.display = '';
+    $('modal-share').style.display = 'none';
     $('modal-next').textContent = '下一关 ›';
     level = clamp(l, 1, N);
     const d = DATA[level - 1];
@@ -287,6 +288,8 @@
     $('modal-best').textContent = isRecord ? '新纪录！' : fmt(prev);
     $('modal-record').style.display = isRecord ? 'inline-block' : 'none';
     $('modal-gain').style.display = 'none';
+    shareCtx = { mode: 'level', level, seconds: t, isRecord };
+    $('modal-share').style.display = '';
     $('overlay').classList.add('show');
     render();
     if (currentUser) settleComplete(t);
@@ -624,6 +627,8 @@
     $('modal-best').textContent = '每日限定';
     $('modal-record').style.display = 'none';
     $('modal-gain').style.display = 'none';
+    shareCtx = { mode: 'daily', seconds: t, isRecord: false };
+    $('modal-share').style.display = '';
     $('overlay').classList.add('show');
     render();
     updateDailyCard();
@@ -650,6 +655,122 @@
       loadAchievements();
       loadDailyCard();
     } catch (e) { /* 结算失败不影响本地完成 */ }
+  }
+
+  // ===== 成绩分享卡片（阶段③） =====
+  let shareCtx = null;
+
+  function drawMiniGrid(g, x, y, size) {
+    const cell = size / 9;
+    g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 1;
+    for (let i = 0; i <= 9; i++) {
+      g.beginPath(); g.moveTo(x + i * cell, y); g.lineTo(x + i * cell, y + size); g.stroke();
+      g.beginPath(); g.moveTo(x, y + i * cell); g.lineTo(x + size, y + i * cell); g.stroke();
+    }
+    g.lineWidth = 2.5;
+    for (let i = 0; i <= 3; i++) {
+      g.beginPath(); g.moveTo(x + i * 3 * cell, y); g.lineTo(x + i * 3 * cell, y + size); g.stroke();
+      g.beginPath(); g.moveTo(x, y + i * 3 * cell); g.lineTo(x + size, y + i * 3 * cell); g.stroke();
+    }
+  }
+
+  function buildShareCard() {
+    if (!shareCtx) return null;
+    const W = 600, H = 800, P = 40;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    const isDaily = shareCtx.mode === 'daily';
+
+    // 背景渐变
+    const grad = g.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, '#63bb5f'); grad.addColorStop(1, '#2f7a44');
+    g.fillStyle = grad; g.fillRect(0, 0, W, H);
+    // 装饰网格
+    drawMiniGrid(g, W - 170, 54, 96);
+
+    // 品牌
+    g.fillStyle = '#ffffff'; g.textBaseline = 'top';
+    g.font = '700 30px system-ui, sans-serif';
+    g.fillText('数独 · 静心一刻', P, 58);
+    g.font = '400 17px system-ui, sans-serif'; g.globalAlpha = .82;
+    g.fillText('一格一数，慢慢来就好', P, 98);
+    g.globalAlpha = 1;
+
+    // 标题（关卡/今日挑战）
+    const title = isDaily ? '今日挑战' : ('第 ' + shareCtx.level + ' 关');
+    g.font = '700 42px system-ui, sans-serif';
+    g.fillText(title, P, 240);
+
+    // 用时
+    g.font = '700 78px system-ui, sans-serif';
+    g.fillText(fmt(shareCtx.seconds), P, 312);
+    g.font = '400 18px system-ui, sans-serif'; g.globalAlpha = .85;
+    g.fillText('本关用时', P, 418); g.globalAlpha = 1;
+
+    // 排名 / 纪录
+    let sub = '🎖 已完成';
+    if (shareCtx.isRecord) sub = '🎉 新纪录！';
+    else if (shareCtx.rank) sub = '🏆 第 ' + shareCtx.rank + ' 名';
+    g.font = '600 27px system-ui, sans-serif';
+    g.fillText(sub, P, 470);
+
+    // 底部：用户名 + 日期
+    const name = currentUser ? (currentUser.nickname || currentUser.username) : '游客';
+    g.font = '500 21px system-ui, sans-serif'; g.globalAlpha = .92;
+    g.fillText(name, P, H - 138);
+    g.fillText(new Date().toLocaleDateString('zh-CN'), P, H - 106);
+    g.globalAlpha = 1;
+
+    // 底部条
+    g.fillStyle = 'rgba(255,255,255,.3)'; g.fillRect(P, H - 64, W - 2 * P, 2);
+    g.font = '400 15px system-ui, sans-serif'; g.globalAlpha = .7;
+    g.fillText('sudoku.southerly.top', P, H - 48); g.globalAlpha = 1;
+    return c;
+  }
+
+  async function openShare() {
+    try {
+      // 关卡模式：拉当前关排名（如未上榜则显示「已完成」）
+      if (shareCtx && !shareCtx.rank && !shareCtx.isRecord && currentUser && shareCtx.mode !== 'daily') {
+        try {
+          const d = await apiCall('leaderboard&level=' + shareCtx.level + '&limit=15', 'GET');
+          if (d.my && d.my.rank) shareCtx.rank = d.my.rank;
+        } catch (e) { /* 排名失败不影响卡片 */ }
+      }
+      const c = buildShareCard();
+      if (!c) { say('暂无可分享的成绩'); return; }
+      $('share-img').src = c.toDataURL('image/png');
+      $('share-overlay').classList.add('show');
+      $('share-system').style.display = (navigator.share && navigator.canShare) ? '' : 'none';
+    } catch (e) { say('生成分享卡片失败'); }
+  }
+
+  function bindShare() {
+    $('modal-share').onclick = openShare;
+    $('share-save').onclick = () => {
+      const a = document.createElement('a');
+      a.href = $('share-img').src;
+      a.download = 'sudoku-成绩.png';
+      a.click();
+    };
+    $('share-copy').onclick = async () => {
+      try {
+        const blob = await (await fetch($('share-img').src)).blob();
+        if (!navigator.clipboard || !window.ClipboardItem) { say('当前浏览器不支持复制图片，可保存图片'); return; }
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        toast('已复制到剪贴板');
+      } catch (e) { say('复制失败，可保存图片'); }
+    };
+    $('share-system').onclick = async () => {
+      try {
+        const blob = await (await fetch($('share-img').src)).blob();
+        const file = new File([blob], 'sudoku.png', { type: 'image/png' });
+        await navigator.share({ files: [file], title: '数独成绩' });
+      } catch (e) { /* 用户取消或失败忽略 */ }
+    };
+    $('share-close').onclick = () => $('share-overlay').classList.remove('show');
+    $('share-overlay').addEventListener('click', e => { if (e.target === $('share-overlay')) $('share-overlay').classList.remove('show'); });
   }
 
   function renderModalGain(d) {
@@ -882,6 +1003,7 @@
   }
 
   bindAuth();
+  bindShare();
   initAuth();
   loadLeaderboard();
   loadLevel(level);

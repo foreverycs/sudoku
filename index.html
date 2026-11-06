@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>数独 · 静心一刻</title>
-<link rel="stylesheet" href="sudoku.css?v=21">
+<link rel="stylesheet" href="sudoku.css?v=23">
 </head>
 <body>
 <div class="shell">
@@ -87,6 +87,20 @@
       <button class="modal-btn ghost" id="modal-replay">重玩本关</button>
       <button class="modal-btn primary" id="modal-next">下一关 ›</button>
     </div>
+    <button class="modal-btn share" id="modal-share" style="display:none">📤 分享成绩</button>
+  </div>
+</div>
+<!-- 成绩分享预览 -->
+<div class="overlay" id="share-overlay">
+  <div class="modal share-modal">
+    <button class="auth-close" id="share-close" aria-label="关闭">✕</button>
+    <h3>分享成绩</h3>
+    <div class="share-img-wrap"><img id="share-img" alt="成绩卡片"></div>
+    <div class="share-actions">
+      <button class="modal-btn ghost" id="share-save">💾 保存图片</button>
+      <button class="modal-btn ghost" id="share-copy">📋 复制图片</button>
+      <button class="modal-btn primary" id="share-system" style="display:none">📤 系统分享</button>
+    </div>
   </div>
 </div>
 <!-- 登录/注册弹窗 -->
@@ -114,6 +128,6 @@
 </div>
 <div class="toasts" id="toasts"></div>
 <script src="sudoku-data.js?v=17"></script>
-<script src="sudoku.js?v=22"></script>
+<script src="sudoku.js?v=23"></script>
 </body>
 </html>

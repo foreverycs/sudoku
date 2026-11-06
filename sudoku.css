@@ -169,6 +169,12 @@ main{display:grid;grid-template-columns:230px minmax(330px,540px) 1fr;gap:40px;a
 .modal-btn.primary{background:var(--green);color:var(--card)}
 .modal-btn.ghost{background:var(--ghost-bg);color:var(--ghost-ink)}
 .modal-btn.record{background:var(--gold);color:var(--card)}
+.modal-btn.share{width:100%;margin-top:10px;background:transparent;border:1px solid var(--line);color:var(--ink)}
+.modal-btn.share:hover{border-color:var(--hover-border);color:var(--green)}
+.share-modal{max-width:360px}
+.share-img-wrap{margin:14px 0;border-radius:12px;overflow:hidden;background:var(--track)}
+#share-img{display:block;width:100%;height:auto}
+.share-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 
 /* ===== 挑战模式开关 ===== */
 .opt-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
