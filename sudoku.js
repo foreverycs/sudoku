@@ -196,7 +196,7 @@
       const b = document.createElement('button');
       b.className = 'cell';
       b.setAttribute('role', 'gridcell');
-      b.onclick = () => { selected = i; paintBoard(); };
+      b.onclick = () => { selected = i; sfx('select'); paintBoard(); };
       boardEl.append(b);
       cellEls[i] = b;
     }
@@ -262,11 +262,13 @@
     history.push({ board: board.slice(), notes: notes.map(s => new Set(s)) });
     if (noteMode) {
       if (notes[selected].has(d)) notes[selected].delete(d); else notes[selected].add(d);
+      sfx('note');
     } else {
       board[selected] = d; notes[selected].clear();
       if (board.every((x, i) => x === solution[i])) { win(); return; }
       const left = board.filter(x => !x).length;
       const correct = d === solution[selected];
+      sfx(correct ? 'place' : 'wrong');
       if (left === 0) say(challenge ? '已填满，请检查是否正确' : '已填满，但有错误，请检查标红的格子');
       else if (correct) say('正确，还剩 ' + left + ' 格');
       else say(challenge ? '已填入 ' + d : '再检查一下这个数字');
@@ -278,10 +280,12 @@
     if (selected < 0 || given[selected]) return;
     history.push({ board: board.slice(), notes: notes.map(s => new Set(s)) });
     board[selected] = 0; notes[selected].clear();
+    sfx('erase');
     saveGame(); render();
   }
 
   function win() {
+    sfx('win');
     if (quickMode) { updateTimer(); const t = seconds; clearInterval(timerId); timerId = null; playStart = 0; quickWin(t); return; }
     if (dailyMode) { dailyWin(); return; }
     updateTimer();
@@ -360,6 +364,7 @@
     if (board[selected] === solution[selected]) { say('这个格子已经填对了'); return; }
     history.push({ board: board.slice(), notes: notes.map(s => new Set(s)) });
     board[selected] = solution[selected]; notes[selected].clear();
+    sfx('hint');
     saveGame(); render(); say('已填入一个正确数字');
   };
   $('continue').onclick = () => loadLevel(level);
@@ -655,6 +660,7 @@
       }
       renderModalGain({ expGain: d.expGain, first: d.firstToday, newAchievements: d.newAchievements });
       if (d.newAchievements && d.newAchievements.length) {
+        sfx('unlock');
         d.newAchievements.forEach(a => toast('🏅 解锁勋章：' + a.name));
       }
       if (d.levelUp) toast('🎉 升级到 Lv.' + d.level + '！');
@@ -810,6 +816,7 @@
       }
       renderModalGain(d);
       if (d.newAchievements && d.newAchievements.length) {
+        sfx('unlock');
         d.newAchievements.forEach(a => toast('🏅 解锁勋章：' + a.name));
       }
       if (d.levelUp) toast('🎉 升级到 Lv.' + d.level + '！');
@@ -825,6 +832,58 @@
       apiCall('progress/' + level, 'PUT', { cells: cellsToStr(board), notes: notesToObj(notes), seconds })
         .catch(() => { /* 网络波动忽略，下次保存重试 */ });
     }, 800);
+  }
+
+  // ===== 音效（阶段⑥）：Web Audio 合成，无需音频文件 =====
+  let soundOn = store.read('soundOn') !== false; // 默认开
+  let audioCtx = null;
+  function ensureAudio() {
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) { try { audioCtx = new AC(); } catch (e) { /* 忽略 */ } }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') { try { audioCtx.resume(); } catch (e) { /* 忽略 */ } }
+    return audioCtx;
+  }
+  function tone(freq, dur, delay, type, vol) {
+    const ctx = ensureAudio();
+    if (!ctx) return;
+    const t0 = ctx.currentTime + (delay || 0);
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(vol || 0.16, t0 + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t0); osc.stop(t0 + dur + 0.03);
+  }
+  function sfx(name) {
+    if (!soundOn) return;
+    try {
+      switch (name) {
+        case 'place':  tone(660, 0.09); break;
+        case 'wrong':  tone(180, 0.15, 0, 'sawtooth', 0.1); break;
+        case 'note':   tone(440, 0.06, 0, 'triangle', 0.1); break;
+        case 'erase':  tone(300, 0.07, 0, 'triangle', 0.1); break;
+        case 'hint':   tone(520, 0.08); tone(700, 0.09, 0.09); break;
+        case 'select': tone(880, 0.035, 0, 'sine', 0.05); break;
+        case 'win':    [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.17, i * 0.12, 'triangle', 0.2)); break;
+        case 'unlock': tone(392, 0.1); tone(523, 0.12, 0.1); tone(659, 0.14, 0.22); break;
+      }
+    } catch (e) { /* 音频失败静默 */ }
+  }
+  function updateSoundBtn() {
+    const b = $('sound');
+    if (b) b.textContent = soundOn ? '🔊' : '🔇';
+  }
+  function toggleSound() {
+    soundOn = !soundOn;
+    store.write('soundOn', soundOn);
+    updateSoundBtn();
+    if (soundOn) sfx('place');
+    say(soundOn ? '🔊 音效已开启' : '🔇 音效已关闭');
   }
 
   // ===== 快速对局（阶段⑤）：本地生成唯一解随机数独，不计入进度/经验 =====
@@ -1018,6 +1077,8 @@
   function bindProfile() {
     $('user-chip').onclick = e => { e.stopPropagation(); openProfile(); };
     $('quick-btn').onclick = startQuick;
+    $('sound').onclick = toggleSound;
+    updateSoundBtn();
     $('profile-close').onclick = closeProfile;
     $('profile-overlay').addEventListener('click', e => { if (e.target === $('profile-overlay')) closeProfile(); });
     $('pf-avatar').onclick = openAvatarPicker;
