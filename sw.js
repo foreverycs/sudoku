@@ -1,22 +1,31 @@
 /* Service Worker —— 数独 · 静心一刻（PWA 离线缓存）
  * 缓存应用外壳：首屏资源离线可用；API 不缓存（动态数据），断网时游戏核心本地可玩。
+ * 版本统一：CACHE 名含版本（发版时 bump 一次），资源 ?v= 从 index.html 动态解析，避免与页面引用不同步。
  */
-const CACHE = 'sudoku-shell-v7';
-const ASSETS = [
-  '/',
-  '/index.html',
-  '/sudoku.css?v=26',
-  '/sudoku.js?v=28',
-  '/sudoku-data.js?v=17',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png'
-];
+const CACHE = 'sudoku-shell-v8';
+
+// 从 index.html 解析当前资源版本号（与页面引用保持一致，免去多处硬编码）
+function buildAssets() {
+  return fetch('/index.html', { cache: 'no-store' })
+    .then(res => res.text())
+    .then(html => {
+      const q = re => { const m = html.match(re); return m ? m[1] : ''; };
+      return [
+        '/', '/index.html', '/manifest.json',
+        '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png',
+        '/sudoku.css?v=' + q(/sudoku\.css\?v=([\d]+)/),
+        '/sudoku.js?v=' + q(/sudoku\.js\?v=([\d]+)/),
+        '/sudoku-data.js?v=' + q(/sudoku-data\.js\?v=([\d]+)/)
+      ];
+    })
+    .catch(() => ['/', '/index.html', '/manifest.json']); // 解析失败回退最小外壳
+}
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())
+    buildAssets()
+      .then(assets => caches.open(CACHE).then(c => c.addAll(assets)))
+      .then(() => self.skipWaiting())
   );
 });
 

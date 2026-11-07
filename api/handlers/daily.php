@@ -123,12 +123,31 @@ function daily_puzzle($dateStr) {
     return array('cells' => implode('', $board), 'answer' => implode('', $answer));
 }
 
+/** 每日题目缓存目录（运行时生成，不在 git） */
+function daily_cache_dir() {
+    $dir = __DIR__ . '/../cache/daily';
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    return $dir;
+}
+
+/** 当日题目（按日期文件缓存，避免同一天多次请求重复生成；写失败则每次重新生成） */
+function daily_puzzle_cached($dateStr) {
+    $file = daily_cache_dir() . '/' . $dateStr . '.json';
+    if (is_file($file)) {
+        $j = json_decode((string)@file_get_contents($file), true);
+        if (is_array($j) && isset($j['cells'], $j['answer'])) return $j;
+    }
+    $p = daily_puzzle($dateStr);
+    @file_put_contents($file, json_encode($p));
+    return $p;
+}
+
 /** GET daily：今日题目 + 用户状态（是否完成/连胜/最近记录） */
 function daily_get() {
     $c = current_user();
     $uid = (int)$c['uid'];
     $today = date('Y-m-d');
-    $p = daily_puzzle($today);
+    $p = daily_puzzle_cached($today);
     $pdo = db();
     $st = $pdo->prepare('SELECT seconds, solved_at FROM daily_records WHERE user_id = ? AND date = ?');
     $st->execute(array($uid, $today));
