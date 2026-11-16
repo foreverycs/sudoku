@@ -10,6 +10,7 @@
  * 也兼容路径式（需 nginx/Apache 重写 /api/xxx → 本文件）。
  */
 require_once __DIR__ . '/resp.php';
+require_once __DIR__ . '/security.php';
 require_once __DIR__ . '/handlers/auth.php';
 require_once __DIR__ . '/handlers/progress.php';
 require_once __DIR__ . '/handlers/game.php';
@@ -33,19 +34,38 @@ if ($r === '') {
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
 
 try {
-    if ($method === 'POST' && $r === 'auth/register') return auth_register();
-    if ($method === 'POST' && $r === 'auth/login')    return auth_login();
+    if ($method === 'POST' && $r === 'auth/register') {
+        if (!rate_limit_check('register', @$_SERVER['REMOTE_ADDR'], 5, 3600)) fail('注册频率过高', 429);
+        return auth_register();
+    }
+    if ($method === 'POST' && $r === 'auth/login') {
+        if (!rate_limit_check('login', @$_SERVER['REMOTE_ADDR'], 10, 60)) fail('登录频率过高', 429);
+        return auth_login();
+    }
     if ($method === 'GET'  && $r === 'auth/me')       return auth_me();
     if ($method === 'GET'  && $r === 'progress')      return progress_all();
-    if ($method === 'PUT'  && preg_match('#^progress/(\d{1,3})$#', $r, $m)) return progress_save((int)$m[1]);
-    if ($method === 'POST' && $r === 'game/complete') return game_complete();
+    if ($method === 'PUT'  && preg_match('#^progress/(\d{1,3})$#', $r, $m)) {
+        if (!rate_limit_check('progress', @$_SERVER['REMOTE_ADDR'], 120, 60)) fail('保存频率过高', 429);
+        return progress_save((int)$m[1]);
+    }
+    if ($method === 'POST' && $r === 'game/start') {
+        if (!rate_limit_check('game_start', @$_SERVER['REMOTE_ADDR'], 30, 60)) fail('开新局频率过高', 429);
+        return game_start();
+    }
+    if ($method === 'POST' && $r === 'game/complete') {
+        if (!rate_limit_check('game_complete', @$_SERVER['REMOTE_ADDR'], 10, 60)) fail('完成频率过高', 429);
+        return game_complete();
+    }
     if ($method === 'GET'  && $r === 'achievements')  return achievements_list();
     if ($method === 'GET'  && $r === 'me/stats')      return me_stats();
     if ($method === 'GET'  && $r === 'profile')       return profile_get();
     if ($method === 'PUT'  && $r === 'me/avatar')     return me_avatar_put();
     if ($method === 'GET'  && $r === 'leaderboard')   return leaderboard();
     if ($method === 'GET'  && $r === 'daily')         return daily_get();
-    if ($method === 'POST' && $r === 'daily/complete') return daily_complete();
+    if ($method === 'POST' && $r === 'daily/complete') {
+        if (!rate_limit_check('daily_complete', @$_SERVER['REMOTE_ADDR'], 2, 86400)) fail('每日挑战完成频率过高', 429);
+        return daily_complete();
+    }
     // 后台管理（阶段五）
     if ($method === 'GET'  && $r === 'admin/overview')        return admin_overview();
     if ($method === 'GET'  && $r === 'admin/users')           return admin_users();

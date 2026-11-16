@@ -167,56 +167,78 @@ function daily_get() {
     ));
 }
 
-/** POST daily/complete：结算每日完成（经验 + 勋章判定，一天一次计经验） */
+/** 验证每日挑战提交棋盘 == 权威解 */
+function validate_daily_solution($submittedCells, $answer) {
+    if (strlen($submittedCells) !== 81 || strlen($answer) !== 81) return false;
+    if (!preg_match('/^[0-9]{81}$/', $submittedCells)) return false;
+    return $submittedCells === $answer;
+}
+
+/** POST daily/complete：验证提交并原子结算（一天一次计经验，幂等，防并发重复发奖） */
 function daily_complete() {
     $c = current_user();
     $b = body();
     $seconds = isset($b['seconds']) ? (int)$b['seconds'] : 0;
+    $cells   = isset($b['cells']) ? trim((string)$b['cells']) : '';
     if ($seconds < 0 || $seconds > 100000) fail('用时无效');
+    if (!preg_match('/^[0-9]{81}$/', $cells)) fail('棋盘数据无效');
     $pdo = db();
     $uid = (int)$c['uid'];
     $today = date('Y-m-d');
-    $st = $pdo->prepare('SELECT id, seconds FROM daily_records WHERE user_id = ? AND date = ?');
-    $st->execute(array($uid, $today));
-    $ex = $st->fetch();
-    $firstToday = !$ex;
-    if ($firstToday) {
-        $pdo->prepare('INSERT INTO daily_records (user_id, date, seconds) VALUES (?,?,?)')
-            ->execute(array($uid, $today, $seconds));
-    }
-    $expGain = $firstToday ? 40 : 0; // 每日挑战基础经验（中等档）
-    $stats = user_stats($uid);
-    $newAch = array();
-    $st = $pdo->prepare('SELECT a.*, (ua.id IS NOT NULL) AS unlocked FROM achievements a LEFT JOIN user_achievements ua ON ua.achievement_id = a.id AND ua.user_id = ? WHERE a.active = 1');
-    $st->execute(array($uid));
-    foreach ($st->fetchAll() as $a) {
-        if ($a['unlocked']) continue;
-        if (achievement_met($a['cond_type'], $a['cond_value'], $stats, $uid)) {
-            $pdo->prepare('INSERT IGNORE INTO user_achievements (user_id, achievement_id) VALUES (?,?)')
-                ->execute(array($uid, $a['id']));
-            $expGain += (int)$a['points'];
-            $newAch[] = array(
-                'code' => $a['code'], 'name' => $a['name'], 'description' => $a['description'],
-                'icon' => $a['icon'], 'category' => $a['category'], 'points' => (int)$a['points'],
-            );
+
+    // 服务端校验提交 == 当日权威解
+    $p = daily_puzzle_cached($today);
+    if (!validate_daily_solution($cells, $p['answer'])) fail('每日挑战棋盘验证失败', 400);
+
+    try {
+        $pdo->beginTransaction();
+
+        // 原子插入，唯一键 (user_id, date) 保证一天一次；rowCount()==1 才是首次
+        $ins = $pdo->prepare('INSERT IGNORE INTO daily_records (user_id, date, seconds) VALUES (?,?,?)');
+        $ins->execute(array($uid, $today, $seconds));
+        $firstToday = ($ins->rowCount() === 1);
+
+        $expGain = $firstToday ? 40 : 0; // 每日挑战基础经验（中等档）
+        $stats = user_stats($uid);
+        $newAch = array();
+        $st = $pdo->prepare('SELECT a.*, (ua.id IS NOT NULL) AS unlocked FROM achievements a LEFT JOIN user_achievements ua ON ua.achievement_id = a.id AND ua.user_id = ? WHERE a.active = 1');
+        $st->execute(array($uid));
+        foreach ($st->fetchAll() as $a) {
+            if ($a['unlocked']) continue;
+            if (achievement_met($a['cond_type'], $a['cond_value'], $stats, $uid)) {
+                $aIns = $pdo->prepare('INSERT IGNORE INTO user_achievements (user_id, achievement_id) VALUES (?,?)');
+                $aIns->execute(array($uid, $a['id']));
+                if ($aIns->rowCount() > 0) {
+                    $expGain += (int)$a['points'];
+                    $newAch[] = array(
+                        'code' => $a['code'], 'name' => $a['name'], 'description' => $a['description'],
+                        'icon' => $a['icon'], 'category' => $a['category'], 'points' => (int)$a['points'],
+                    );
+                }
+            }
         }
+        $st = $pdo->prepare('SELECT exp, level FROM users WHERE id = ?');
+        $st->execute(array($uid));
+        $u = $st->fetch();
+        $oldLevel = (int)$u['level'];
+        $newExp = (int)$u['exp'] + $expGain;
+        $newLevel = calc_level($newExp);
+        if ($expGain > 0) {
+            $pdo->prepare('UPDATE users SET exp = ?, level = ? WHERE id = ?')->execute(array($newExp, $newLevel, $uid));
+        }
+        $pdo->commit();
+
+        ok(array(
+            'firstToday' => $firstToday,
+            'expGain'    => $expGain,
+            'exp'        => $newExp,
+            'level'      => $newLevel,
+            'levelUp'    => $newLevel > $oldLevel,
+            'streak'     => daily_streak($uid),
+            'newAchievements' => $newAch,
+        ));
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        fail('每日结算失败：' . $e->getMessage(), 500);
     }
-    $st = $pdo->prepare('SELECT exp, level FROM users WHERE id = ?');
-    $st->execute(array($uid));
-    $u = $st->fetch();
-    $oldLevel = (int)$u['level'];
-    $newExp = (int)$u['exp'] + $expGain;
-    $newLevel = calc_level($newExp);
-    if ($expGain > 0) {
-        $pdo->prepare('UPDATE users SET exp = ?, level = ? WHERE id = ?')->execute(array($newExp, $newLevel, $uid));
-    }
-    ok(array(
-        'firstToday' => $firstToday,
-        'expGain'    => $expGain,
-        'exp'        => $newExp,
-        'level'      => $newLevel,
-        'levelUp'    => $newLevel > $oldLevel,
-        'streak'     => daily_streak($uid),
-        'newAchievements' => $newAch,
-    ));
 }

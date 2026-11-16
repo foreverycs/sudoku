@@ -30,6 +30,19 @@
   const dailyStore = { read() { try { return JSON.parse(localStorage.getItem(DAILY_KEY) || '{}'); } catch { return {}; } }, write(d) { try { localStorage.setItem(DAILY_KEY, JSON.stringify(d)); } catch { /* 禁用时不保存 */ } } };
   let dailyMode = false, dailyData = null, dailyDone = false, dailySavedDate = '';
   let quickMode = false;
+  // 服务端尝试（幂等结算）：首次操作时调用 game/start 拿 attempt_key
+  let attemptKey = '';
+  let attemptStartP = null;
+  function ensureAttemptStarted() {
+    if (!currentUser || dailyMode || quickMode) return Promise.resolve(null);
+    if (attemptKey) return Promise.resolve(attemptKey);
+    if (!attemptStartP) {
+      attemptStartP = apiCall('game/start', 'POST', { level })
+        .then(d => { attemptKey = d.attempt_key; return attemptKey; })
+        .catch(e => { attemptStartP = null; throw e; });
+    }
+    return attemptStartP;
+  }
 
   const $ = id => document.getElementById(id);
   const boardEl = $('board');
@@ -54,7 +67,12 @@
     let json = null;
     try { json = await res.json(); } catch { /* 空响应 */ }
     if (!json) { const e = new Error('网络异常或服务器无响应'); e.status = 0; throw e; }
-    if (!json.ok) { const e = new Error(json.error || '请求失败'); e.status = res.status; throw e; }
+    if (!json.ok) {
+      const e = new Error(json.error || '请求失败');
+      e.status = res.status;
+      e.extra = json.extra; // 409 冲突时附带最新云端记录
+      throw e;
+    }
     return json.data;
   }
 
@@ -68,7 +86,8 @@
     if (quickMode) return;
     if (dailyMode) { saveDailyLocal(); return; }
     saved.boards = saved.boards || {};
-    saved.boards[level] = { cells: board.slice(), notes: notes.map(s => [...s]), seconds, ts: Date.now() };
+    const prev = saved.boards[level] || {};
+    saved.boards[level] = { cells: board.slice(), notes: notes.map(s => [...s]), seconds, ts: Date.now(), revision: prev.revision || 0 };
     persist();
     queuePush();
   }
@@ -76,6 +95,7 @@
   function loadLevel(l) {
     dailyMode = false; dailyData = null; dailyDone = false; dailySavedDate = '';
     quickMode = false;
+    attemptKey = ''; attemptStartP = null; // 新关卡重置服务端尝试
     $('modal-title').textContent = '恭喜完成本关！';
     $('modal-replay').style.display = '';
     $('modal-share').style.display = 'none';
@@ -259,6 +279,7 @@
   function enter(d) {
     if (selected < 0 || given[selected]) return;
     if (!playStart) startTimer(); // 首次操作（填数/笔记）才开始计时
+    ensureAttemptStarted().catch(() => { /* 启动失败不阻塞本地操作，结算时再试 */ });
     history.push({ board: board.slice(), notes: notes.map(s => new Set(s)) });
     if (noteMode) {
       if (notes[selected].has(d)) notes[selected].delete(d); else notes[selected].add(d);
@@ -651,7 +672,7 @@
 
   async function settleDaily(seconds) {
     try {
-      const d = await apiCall('daily/complete', 'POST', { seconds });
+      const d = await apiCall('daily/complete', 'POST', { seconds, cells: cellsToStr(board) });
       if (currentUser) {
         currentUser.exp = d.exp;
         currentUser.level = d.level;
@@ -807,7 +828,10 @@
 
   async function settleComplete(seconds) {
     try {
-      const d = await apiCall('game/complete', 'POST', { level, seconds });
+      let key = attemptKey;
+      if (!key) { try { key = await ensureAttemptStarted(); } catch (e) { /* 启动失败则跳过 */ } }
+      if (!key) { say('未登录或尝试启动失败，本次成绩未计入'); return; }
+      const d = await apiCall('game/complete', 'POST', { level, seconds, attempt_key: key, cells: cellsToStr(board) });
       if (currentUser) {
         currentUser.exp = d.exp;
         currentUser.level = d.level;
@@ -826,13 +850,43 @@
     } catch (e) { /* 结算失败不影响本地通关 */ }
   }
 
+  // 409 冲突合并：本地已填保留，云端仅补空格；笔记取并集；秒数取较大；以云端 revision 为 base 重推
+  function mergeCloudConflict(lv, extra) {
+    if (!extra) return;
+    const cloudCells = strToCells(extra.cells || '');
+    const cloudNotes = objToNotes(extra.notes || {});
+    const isCur = (lv === level && !dailyMode && !quickMode);
+    const localCells = isCur ? board.slice() : (saved.boards && saved.boards[lv] && Array.isArray(saved.boards[lv].cells) ? saved.boards[lv].cells.slice() : cloudCells.slice());
+    const localNotes = isCur ? notes : (saved.boards && saved.boards[lv] && Array.isArray(saved.boards[lv].notes) ? saved.boards[lv].notes : []);
+    const mergedCells = localCells.slice();
+    for (let i = 0; i < 81; i++) if (!mergedCells[i]) mergedCells[i] = cloudCells[i] || 0;
+    const mergedNotes = Array.from({ length: 81 }, () => []);
+    for (let i = 0; i < 81; i++) {
+      const s = new Set([...(Array.isArray(localNotes[i]) ? localNotes[i] : []), ...(Array.isArray(cloudNotes[i]) ? cloudNotes[i] : [])]);
+      mergedNotes[i] = [...s];
+    }
+    const mergedSeconds = Math.max((extra.seconds | 0), (isCur ? seconds : ((saved.boards && saved.boards[lv] && saved.boards[lv].seconds) | 0) || 0));
+    saved.boards = saved.boards || {};
+    saved.boards[lv] = { cells: mergedCells, notes: mergedNotes, seconds: mergedSeconds, ts: Date.now(), revision: extra.revision || 0 };
+    if (isCur) { board = mergedCells.slice(); notes = mergedNotes.map(a => new Set(a)); seconds = mergedSeconds; render(); }
+    persist();
+    say('云端进度冲突已合并，保留本机进度');
+    return apiCall('progress/' + lv, 'PUT', { cells: cellsToStr(mergedCells), notes: notesToObj(mergedNotes), seconds: mergedSeconds, baseRevision: extra.revision || 0 })
+      .then(d => { if (d && d.revision && saved.boards[lv]) saved.boards[lv].revision = d.revision; persist(); })
+      .catch(() => {});
+  }
+
   function queuePush() {
     if (!currentUser) return;
     clearTimeout(pushTimer);
     pushTimer = setTimeout(() => {
       if (!currentUser) return;
-      apiCall('progress/' + level, 'PUT', { cells: cellsToStr(board), notes: notesToObj(notes), seconds })
-        .catch(() => { /* 网络波动忽略，下次保存重试 */ });
+      saved.boards = saved.boards || {};
+      const st = saved.boards[level];
+      const baseRev = (st && st.revision) ? st.revision : 0;
+      apiCall('progress/' + level, 'PUT', { cells: cellsToStr(board), notes: notesToObj(notes), seconds, baseRevision: baseRev })
+        .then(d => { if (d && d.revision && saved.boards[level]) { saved.boards[level].revision = d.revision; persist(); } })
+        .catch(e => { if (e.status === 409 && e.extra) mergeCloudConflict(level, e.extra); /* 其它错误下次重试 */ });
     }, 800);
   }
 
@@ -1156,7 +1210,7 @@
       const lv = +k;
       if (!lv || lv < 1 || lv > N) return;
       const c = cloud[lv];
-      saved.boards[lv] = { cells: strToCells(c.cells), notes: objToNotes(c.notes), seconds: (c.seconds | 0), ts: Date.now() };
+      saved.boards[lv] = { cells: strToCells(c.cells), notes: objToNotes(c.notes), seconds: (c.seconds | 0), ts: Date.now(), revision: c.revision || 0 };
       changed = true;
     });
     Object.keys(saved.boards).forEach(k => {
@@ -1164,7 +1218,10 @@
       if (!lv || lv < 1 || lv > N || cloud[lv]) return;
       const b = saved.boards[lv];
       if (!b || !Array.isArray(b.cells)) return;
-      apiCall('progress/' + lv, 'PUT', { cells: cellsToStr(b.cells), notes: notesToObj(b.notes || []), seconds: (b.seconds | 0) }).catch(() => {});
+      const baseRev = b.revision || 0;
+      apiCall('progress/' + lv, 'PUT', { cells: cellsToStr(b.cells), notes: notesToObj(b.notes || []), seconds: (b.seconds | 0), baseRevision: baseRev })
+        .then(d => { if (d && d.revision) b.revision = d.revision; })
+        .catch(e => { if (e.status === 409 && e.extra) mergeCloudConflict(lv, e.extra); });
     });
     if (changed || statChanged) persist();
     if (statChanged) render();

@@ -8,6 +8,11 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/resp.php';
 require_once __DIR__ . '/compat.php';
 
+// 生产环境默认关闭；首次安装需在私有 config.php 临时定义 INSTALL_ENABLED=true。
+if (!defined('INSTALL_ENABLED') || INSTALL_ENABLED !== true) {
+    fail('安装入口已关闭', 404);
+}
+
 function seed_achievements($pdo) {
     $items = [
         ['prog_1',    '初露锋芒', '完成第 1 关',           'progress',    'complete_count', 1,     10],

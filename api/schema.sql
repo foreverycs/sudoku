@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS game_progress (
   cells      VARCHAR(81) NOT NULL DEFAULT '',
   notes      TEXT NULL,
   seconds    INT UNSIGNED NOT NULL DEFAULT 0,
+  revision   BIGINT UNSIGNED NOT NULL DEFAULT 1,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_user_level (user_id, level),
   CONSTRAINT fk_progress_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -72,4 +73,20 @@ CREATE TABLE IF NOT EXISTS daily_records (
   solved_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_user_date (user_id, date),
   CONSTRAINT fk_daily_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 游戏尝试记录（幂等结算 + 防刷分；存量部署由 api/security.php 自动迁移）
+CREATE TABLE IF NOT EXISTS game_attempts (
+  id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id         INT UNSIGNED NOT NULL,
+  level           SMALLINT UNSIGNED NOT NULL,
+  attempt_key     VARCHAR(64) NOT NULL,
+  started_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  completed_at    DATETIME NULL,
+  submitted_cells VARCHAR(81) NULL,
+  is_valid        TINYINT(1) NOT NULL DEFAULT 0,
+  result_json     TEXT NULL,
+  UNIQUE KEY uq_user_level_key (user_id, level, attempt_key),
+  INDEX idx_attempt_user (user_id, level),
+  CONSTRAINT fk_attempt_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

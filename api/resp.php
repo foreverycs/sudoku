@@ -12,8 +12,10 @@ function ok($data = null) {
     json_out(array('ok' => true, 'data' => $data));
 }
 
-function fail($msg, $code = 400) {
-    json_out(array('ok' => false, 'error' => $msg), $code);
+function fail($msg, $code = 400, $extra = null) {
+    $out = array('ok' => false, 'error' => $msg);
+    if ($extra !== null) $out['extra'] = $extra;
+    json_out($out, $code);
 }
 
 /** 解析请求 JSON body */
