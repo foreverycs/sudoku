@@ -29,12 +29,6 @@ function profile_get() {
     if (!$user) fail('用户不存在', 404);
     $stats = user_stats($uid);
 
-    // 各关最佳（level -> best seconds）
-    $st = $pdo->prepare('SELECT level, MIN(seconds) AS best FROM game_records WHERE user_id = ? GROUP BY level ORDER BY level');
-    $st->execute([$uid]);
-    $bestByLevel = array();
-    foreach ($st->fetchAll() as $r) $bestByLevel[(int)$r['level']] = (int)$r['best'];
-
     // 最近完成记录（前 10 条）
     $st = $pdo->prepare('SELECT level, seconds, is_record, played_at FROM game_records WHERE user_id = ? ORDER BY id DESC LIMIT 10');
     $st->execute([$uid]);
@@ -74,7 +68,6 @@ function profile_get() {
         'expNext' => exp_needed($user['level']),
         'levelExp' => level_exp_into($user['exp'], $user['level']),
         'stats' => $stats,
-        'bestByLevel' => $bestByLevel,
         'recent' => $recent,
         'daily' => array(
             'todayDone' => $todayDone,

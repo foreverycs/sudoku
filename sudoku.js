@@ -33,8 +33,19 @@
   // 服务端尝试（幂等结算）：首次操作时调用 game/start 拿 attempt_key
   let attemptKey = '';
   let attemptStartP = null;
+  let dailyAttemptKey = '';
+  let dailyAttemptStartP = null;
   function ensureAttemptStarted() {
-    if (!currentUser || dailyMode || quickMode) return Promise.resolve(null);
+    if (!currentUser || quickMode) return Promise.resolve(null);
+    if (dailyMode) {
+      if (dailyAttemptKey) return Promise.resolve(dailyAttemptKey);
+      if (!dailyAttemptStartP) {
+        dailyAttemptStartP = apiCall('daily/start', 'POST', {})
+          .then(d => { dailyAttemptKey = d.attempt_key; return dailyAttemptKey; })
+          .catch(e => { dailyAttemptStartP = null; throw e; });
+      }
+      return dailyAttemptStartP;
+    }
     if (attemptKey) return Promise.resolve(attemptKey);
     if (!attemptStartP) {
       attemptStartP = apiCall('game/start', 'POST', { level })
@@ -96,6 +107,7 @@
     dailyMode = false; dailyData = null; dailyDone = false; dailySavedDate = '';
     quickMode = false;
     attemptKey = ''; attemptStartP = null; // 新关卡重置服务端尝试
+    dailyAttemptKey = ''; dailyAttemptStartP = null;
     $('modal-title').textContent = '恭喜完成本关！';
     $('modal-replay').style.display = '';
     $('modal-share').style.display = 'none';
@@ -134,6 +146,8 @@
     $('timer').textContent = fmt(seconds);
   }
   function pauseTimer() {
+    // Signed-in ranked attempts use server wall-clock time; keep the UI clock consistent while backgrounded.
+    if (currentUser && !quickMode) return;
     if (!timerId || !playStart) return;
     playAcc += Date.now() - playStart;
     playStart = 0;
@@ -279,7 +293,7 @@
   function enter(d) {
     if (selected < 0 || given[selected]) return;
     if (!playStart) startTimer(); // 首次操作（填数/笔记）才开始计时
-    ensureAttemptStarted().catch(() => { /* 启动失败不阻塞本地操作，结算时再试 */ });
+    if (currentUser) ensureAttemptStarted().catch(() => { /* 启动失败不阻塞本地操作，结算时再试 */ });
     history.push({ board: board.slice(), notes: notes.map(s => new Set(s)) });
     if (noteMode) {
       if (notes[selected].has(d)) notes[selected].delete(d); else notes[selected].add(d);
@@ -374,6 +388,7 @@
     if (quickMode) { startQuick(); say('已重新生成快速对局'); return; }
     if (dailyMode) { dailyStore.write({}); loadDaily(); say('今日挑战已重新开始'); return; }
     if (saved.boards) delete saved.boards[level];
+    attemptKey = ''; attemptStartP = null;
     clearInterval(timerId); timerId = null; playAcc = 0; playStart = 0;
     loadLevel(level);
     say('已重新开始第 ' + level + ' 关');
@@ -622,6 +637,7 @@
   // 进入今日挑战：复用棋盘，题面来自每日接口，不写 saved.boards
   async function loadDaily() {
     if (!currentUser) { say('请先登录后参加今日挑战'); openAuth('login'); return; }
+    dailyAttemptKey = ''; dailyAttemptStartP = null;
     try {
       const d = await apiCall('daily', 'GET');
       dailyData = d;
@@ -672,7 +688,17 @@
 
   async function settleDaily(seconds) {
     try {
-      const d = await apiCall('daily/complete', 'POST', { seconds, cells: cellsToStr(board) });
+      let key = dailyAttemptKey;
+      if (!key) { try { key = await ensureAttemptStarted(); } catch (e) { /* 启动失败 */ } }
+      if (!key) { say('每日挑战计时启动失败，成绩未提交'); return; }
+      const clientSeconds = seconds;
+      const d = await apiCall('daily/complete', 'POST', { seconds: clientSeconds, cells: cellsToStr(board), attempt_key: key });
+      if (d.seconds) {
+        seconds = d.seconds;
+        $('modal-time').textContent = fmt(seconds);
+        shareCtx = { mode: 'daily', seconds, isRecord: false };
+        saveDailyLocal();
+      }
       if (currentUser) {
         currentUser.exp = d.exp;
         currentUser.level = d.level;
@@ -831,7 +857,8 @@
       let key = attemptKey;
       if (!key) { try { key = await ensureAttemptStarted(); } catch (e) { /* 启动失败则跳过 */ } }
       if (!key) { say('未登录或尝试启动失败，本次成绩未计入'); return; }
-      const d = await apiCall('game/complete', 'POST', { level, seconds, attempt_key: key, cells: cellsToStr(board) });
+      const clientSeconds = seconds;
+      const d = await apiCall('game/complete', 'POST', { level, seconds: clientSeconds, attempt_key: key, cells: cellsToStr(board) });
       if (currentUser) {
         currentUser.exp = d.exp;
         currentUser.level = d.level;
@@ -839,6 +866,15 @@
         currentUser.levelExp = d.levelExp;
         updateUserUI();
         renderLevelCard(currentUser);
+      }
+      if (d.seconds) {
+        seconds = d.seconds;
+        if (d.bestSeconds) best[level] = d.bestSeconds;
+        $('modal-best').textContent = d.isRecord ? '新纪录！' : fmt(d.bestSeconds || d.seconds);
+        $('modal-record').style.display = d.isRecord ? 'inline-block' : 'none';
+        shareCtx = { mode: 'level', level, seconds: d.seconds, isRecord: !!d.isRecord };
+        $('modal-time').textContent = fmt(seconds);
+        saveGame();
       }
       renderModalGain(d);
       if (d.newAchievements && d.newAchievements.length) {
@@ -1072,6 +1108,9 @@
       const d = await apiCall('profile', 'GET');
       profileData = d;
       renderProfile(d);
+      if (!$('pf-history-level').options.length) $('pf-history-level').innerHTML = Array.from({ length: N }, (_, i) => '<option value="' + (i + 1) + '">第 ' + (i + 1) + ' 关</option>').join('');
+      $('pf-history-level').value = String(level);
+      loadProgressHistory();
     } catch (e) { say('加载主页失败：' + e.message); }
   }
   function closeProfile() { $('profile-overlay').classList.remove('show'); }
@@ -1090,6 +1129,8 @@
     $('pf-total').textContent = fmtClock(s.total_seconds || 0);
     $('pf-best').textContent = s.best_min ? fmtClock(s.best_min) : '--';
     $('pf-max').textContent = s.max_level || 0;
+    $('pf-average').textContent = s.average_seconds ? fmtClock(s.average_seconds) : '--';
+    $('pf-attempts').textContent = s.attempt_count || 0;
     const dl = d.daily || {};
     $('pf-daily-txt').textContent = '今日挑战：' + (dl.todayDone ? '✅ 已完成' : '未完成');
     $('pf-streak').textContent = '连胜 ' + (dl.streak || 0) + ' 天';
@@ -1107,6 +1148,57 @@
       + (r.is_record ? '<span class="pf-rec-badge">纪录</span>' : '')
       + '</div>').join('')
       : '<span class="pf-empty">暂无完成记录</span>';
+  }
+
+  async function loadProgressHistory() {
+    if (!currentUser) return;
+    const lv = clamp(parseInt($('pf-history-level').value, 10) || level, 1, N);
+    const root = $('pf-history');
+    root.innerHTML = '<span class="pf-empty">加载中…</span>';
+    try {
+      const d = await apiCall('progress/' + lv + '/history', 'GET');
+      const rows = d.history || [];
+      if (!rows.length) { root.innerHTML = '<span class="pf-empty">第 ' + lv + ' 关暂无历史快照</span>'; return; }
+      root.innerHTML = rows.map(h => '<div class="pf-history-row">'
+        + '<div><strong>' + esc(String(h.created_at || '')) + '</strong><span>用时 ' + fmtClock(h.seconds) + ' · 版本 ' + h.revision + '</span></div>'
+        + '<button type="button" class="modal-btn ghost" data-history-id="' + h.id + '" data-history-rev="' + d.currentRevision + '" data-history-cells="' + esc(h.cells || '') + '">预览</button>'
+        + '</div>').join('');
+    } catch (e) { root.innerHTML = '<span class="pf-empty">历史加载失败：' + esc(e.message) + '</span>'; }
+  }
+
+  function previewProgressHistory(btn) {
+    const cells = strToCells(btn.dataset.historyCells || '');
+    if (cells.length !== 81) { say('历史快照棋盘数据无效'); return; }
+    const lv = clamp(parseInt($('pf-history-level').value, 10) || level, 1, N);
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay show';
+    overlay.innerHTML = '<div class="modal pf-preview"><h3>第 ' + lv + ' 关历史预览</h3><div class="pf-preview-grid"></div><div class="pf-preview-actions"><button class="modal-btn ghost" type="button" data-close>返回</button><button class="modal-btn primary" type="button" data-restore>恢复此版本</button></div></div>';
+    const grid = overlay.querySelector('.pf-preview-grid');
+    grid.innerHTML = cells.map((v, i) => '<div class="pf-preview-cell">' + (v || '') + '</div>').join('');
+    document.body.appendChild(overlay);
+    overlay.querySelector('[data-close]').onclick = () => overlay.remove();
+    overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+    overlay.querySelector('[data-restore]').onclick = () => {
+      overlay.remove();
+      restoreProgressHistory(+btn.dataset.historyId, +btn.dataset.historyRev);
+    };
+  }
+
+  async function restoreProgressHistory(historyId, baseRevision) {
+    const lv = clamp(parseInt($('pf-history-level').value, 10) || level, 1, N);
+    if (!window.confirm('恢复第 ' + lv + ' 关的历史进度？当前版本会先保存到历史记录。')) return;
+    try {
+      const d = await apiCall('progress/' + lv + '/restore', 'POST', { historyId, baseRevision });
+      saved.boards = saved.boards || {};
+      saved.boards[lv] = { cells: strToCells(d.cells), notes: objToNotes(d.notes), seconds: d.seconds | 0, ts: Date.now(), revision: d.revision };
+      persist();
+      if (lv === level && !dailyMode && !quickMode) loadLevel(lv);
+      say('第 ' + lv + ' 关进度已恢复');
+      await loadProgressHistory();
+    } catch (e) {
+      if (e.status === 409) say('云端进度已变化，请重新加载历史后再恢复');
+      else say('恢复失败：' + e.message);
+    }
   }
 
   function openAvatarPicker() {
@@ -1136,6 +1228,13 @@
     $('sound').onclick = toggleSound;
     updateSoundBtn();
     $('profile-close').onclick = closeProfile;
+    $('pf-history-level').value = String(level);
+    $('pf-history-load').onclick = loadProgressHistory;
+    $('pf-history-level').onchange = loadProgressHistory;
+    $('pf-history').onclick = e => {
+      const btn = e.target.closest ? e.target.closest('[data-history-id]') : null;
+      if (btn) previewProgressHistory(btn);
+    };
     $('profile-overlay').addEventListener('click', e => { if (e.target === $('profile-overlay')) closeProfile(); });
     $('pf-avatar').onclick = openAvatarPicker;
     $('avatar-close').onclick = () => $('avatar-overlay').classList.remove('show');
@@ -1235,7 +1334,7 @@
       currentUser = d.user;
       currentUser.expNext = d.expNext || 100;
       currentUser.levelExp = d.levelExp || 0;
-      updateUserUI();
+        updateUserUI();
       renderLevelCard(currentUser);
       loadAchievements();
       loadDailyCard();
@@ -1277,6 +1376,7 @@
         say('欢迎回来，' + (currentUser.nickname || currentUser.username));
         const changed = await syncProgress();
         if (changed) loadLevel(level);
+        if (!dailyMode && !quickMode && timerId) ensureAttemptStarted().catch(() => {});
       } catch (err) {
         msg.style.color = 'var(--red)'; msg.textContent = err.message;
       } finally { btn.disabled = false; }
@@ -1305,6 +1405,7 @@
         say('注册成功，欢迎加入！');
         const changed = await syncProgress();
         if (changed) loadLevel(level);
+        if (!dailyMode && !quickMode && timerId) ensureAttemptStarted().catch(() => {});
       } catch (err) {
         msg.style.color = 'var(--red)'; msg.textContent = err.message;
       } finally { btn.disabled = false; }

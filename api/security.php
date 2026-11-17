@@ -33,6 +33,20 @@ function ensure_security_schema() {
         CONSTRAINT fk_attempt_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
+    // 云进度历史快照（恢复时作为新版本写回当前进度）
+    $pdo->exec('CREATE TABLE IF NOT EXISTS game_progress_history (
+        id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        user_id    INT UNSIGNED NOT NULL,
+        level      SMALLINT UNSIGNED NOT NULL,
+        cells      VARCHAR(81) NOT NULL,
+        notes      TEXT NULL,
+        seconds    INT UNSIGNED NOT NULL DEFAULT 0,
+        revision   BIGINT UNSIGNED NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_history_user_level (user_id, level, id),
+        CONSTRAINT fk_history_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+
     // revision 列（MySQL/MariaDB 通用：先查 information_schema 再 ALTER）
     try {
         $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "game_progress" AND COLUMN_NAME = "revision"');

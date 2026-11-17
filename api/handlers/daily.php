@@ -180,11 +180,22 @@ function daily_complete() {
     $b = body();
     $seconds = isset($b['seconds']) ? (int)$b['seconds'] : 0;
     $cells   = isset($b['cells']) ? trim((string)$b['cells']) : '';
+    $attemptKey = isset($b['attempt_key']) ? trim((string)$b['attempt_key']) : '';
     if ($seconds < 0 || $seconds > 100000) fail('用时无效');
     if (!preg_match('/^[0-9]{81}$/', $cells)) fail('棋盘数据无效');
+    if ($attemptKey === '' || strlen($attemptKey) > 64) fail('缺少每日挑战编号');
     $pdo = db();
     $uid = (int)$c['uid'];
     $today = date('Y-m-d');
+
+    $st = $pdo->prepare('SELECT id, started_at, completed_at, result_json FROM game_attempts WHERE user_id = ? AND level = 0 AND attempt_key = ?');
+    $st->execute(array($uid, $attemptKey));
+    $attempt = $st->fetch();
+    if (!$attempt) fail('每日挑战服务端计时不存在，请重新开始', 409);
+    if ($attempt['completed_at'] && $attempt['result_json']) {
+        $cached = json_decode($attempt['result_json'], true);
+        if (is_array($cached) && isset($cached['expGain'])) return ok($cached);
+    }
 
     // 服务端校验提交 == 当日权威解
     $p = daily_puzzle_cached($today);
@@ -192,6 +203,27 @@ function daily_complete() {
 
     try {
         $pdo->beginTransaction();
+
+        $st = $pdo->prepare('SELECT id, started_at, completed_at FROM game_attempts WHERE user_id = ? AND level = 0 AND attempt_key = ? FOR UPDATE');
+        $st->execute(array($uid, $attemptKey));
+        $lockedAttempt = $st->fetch();
+        if (!$lockedAttempt) { $pdo->rollBack(); fail('每日挑战计时不存在', 409); }
+        if ($lockedAttempt['completed_at']) {
+            $st = $pdo->prepare('SELECT result_json FROM game_attempts WHERE id = ?');
+            $st->execute(array($lockedAttempt['id']));
+            $cachedRow = $st->fetch();
+            $pdo->rollBack();
+            $cached = $cachedRow ? json_decode($cachedRow['result_json'], true) : null;
+            if (is_array($cached) && isset($cached['expGain'])) return ok($cached);
+            fail('每日挑战已结算', 409);
+        }
+        // Serialize daily rewards with other account settlements.
+        $userLock = $pdo->prepare('SELECT id FROM users WHERE id = ? FOR UPDATE');
+        $userLock->execute(array($uid));
+        $elapsedQuery = $pdo->prepare('SELECT GREATEST(1, TIMESTAMPDIFF(SECOND, ?, NOW()) + 1) AS elapsed');
+        $elapsedQuery->execute(array($lockedAttempt['started_at']));
+        $elapsedRow = $elapsedQuery->fetch();
+        $seconds = min(100000, max($seconds, (int)$elapsedRow['elapsed']));
 
         // 原子插入，唯一键 (user_id, date) 保证一天一次；rowCount()==1 才是首次
         $ins = $pdo->prepare('INSERT IGNORE INTO daily_records (user_id, date, seconds) VALUES (?,?,?)');
@@ -226,9 +258,7 @@ function daily_complete() {
         if ($expGain > 0) {
             $pdo->prepare('UPDATE users SET exp = ?, level = ? WHERE id = ?')->execute(array($newExp, $newLevel, $uid));
         }
-        $pdo->commit();
-
-        ok(array(
+        $result = array(
             'firstToday' => $firstToday,
             'expGain'    => $expGain,
             'exp'        => $newExp,
@@ -236,7 +266,13 @@ function daily_complete() {
             'levelUp'    => $newLevel > $oldLevel,
             'streak'     => daily_streak($uid),
             'newAchievements' => $newAch,
-        ));
+            'seconds' => $seconds,
+        );
+        $pdo->prepare('UPDATE game_attempts SET completed_at = NOW(), is_valid = 1, submitted_cells = ?, result_json = ? WHERE id = ?')
+            ->execute(array($cells, json_encode($result), $lockedAttempt['id']));
+        $pdo->commit();
+
+        ok($result);
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         fail('每日结算失败：' . $e->getMessage(), 500);

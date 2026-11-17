@@ -45,15 +45,33 @@ try {
     if ($method === 'GET'  && $r === 'auth/me')       return auth_me();
     if ($method === 'GET'  && $r === 'progress')      return progress_all();
     if ($method === 'PUT'  && preg_match('#^progress/(\d{1,3})$#', $r, $m)) {
-        if (!rate_limit_check('progress', @$_SERVER['REMOTE_ADDR'], 120, 60)) fail('保存频率过高', 429);
+        $rateUser = current_user();
+        if (!rate_limit_check('progress', 'uid:' . (int)$rateUser['uid'], 120, 60)) fail('保存频率过高', 429);
         return progress_save((int)$m[1]);
     }
+    if ($method === 'GET' && preg_match('#^progress/(\d{1,3})/history$#', $r, $m)) {
+        $rateUser = current_user();
+        if (!rate_limit_check('progress_history', 'uid:' . (int)$rateUser['uid'], 60, 60)) fail('历史查询过于频繁', 429);
+        return progress_history((int)$m[1]);
+    }
+    if ($method === 'POST' && preg_match('#^progress/(\d{1,3})/restore$#', $r, $m)) {
+        $rateUser = current_user();
+        if (!rate_limit_check('progress_restore', 'uid:' . (int)$rateUser['uid'], 10, 60)) fail('恢复操作过于频繁', 429);
+        return progress_restore((int)$m[1]);
+    }
     if ($method === 'POST' && $r === 'game/start') {
-        if (!rate_limit_check('game_start', @$_SERVER['REMOTE_ADDR'], 30, 60)) fail('开新局频率过高', 429);
+        $rateUser = current_user();
+        if (!rate_limit_check('game_start', 'uid:' . (int)$rateUser['uid'], 30, 60)) fail('开新局频率过高', 429);
         return game_start();
     }
+    if ($method === 'POST' && $r === 'daily/start') {
+        $rateUser = current_user();
+        if (!rate_limit_check('daily_start', 'uid:' . (int)$rateUser['uid'], 30, 3600)) fail('每日挑战开局频率过高', 429);
+        return daily_start();
+    }
     if ($method === 'POST' && $r === 'game/complete') {
-        if (!rate_limit_check('game_complete', @$_SERVER['REMOTE_ADDR'], 10, 60)) fail('完成频率过高', 429);
+        $rateUser = current_user();
+        if (!rate_limit_check('game_complete', 'uid:' . (int)$rateUser['uid'], 10, 60)) fail('完成频率过高', 429);
         return game_complete();
     }
     if ($method === 'GET'  && $r === 'achievements')  return achievements_list();
@@ -63,7 +81,8 @@ try {
     if ($method === 'GET'  && $r === 'leaderboard')   return leaderboard();
     if ($method === 'GET'  && $r === 'daily')         return daily_get();
     if ($method === 'POST' && $r === 'daily/complete') {
-        if (!rate_limit_check('daily_complete', @$_SERVER['REMOTE_ADDR'], 2, 86400)) fail('每日挑战完成频率过高', 429);
+        $rateUser = current_user();
+        if (!rate_limit_check('daily_complete', 'uid:' . (int)$rateUser['uid'], 2, 86400)) fail('每日挑战完成频率过高', 429);
         return daily_complete();
     }
     // 后台管理（阶段五）

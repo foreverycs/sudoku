@@ -194,7 +194,7 @@ main{display:grid;grid-template-columns:230px minmax(330px,540px) 1fr;gap:40px;a
 .pf-exp-bar{height:8px;border-radius:5px;background:var(--track);overflow:hidden;margin-bottom:6px}
 .pf-exp-bar i{display:block;height:100%;background:var(--green);border-radius:5px;transition:width .3s}
 #pf-exp-text{display:block;text-align:right}
-.pf-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}
+.pf-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
 .pf-stats>div{background:var(--pale);border-radius:10px;padding:10px 4px;text-align:center}
 .pf-stats b{display:block;font-size:16px;color:var(--green)}
 .pf-stats span{font-size:11px;color:var(--muted)}
@@ -211,6 +211,21 @@ main{display:grid;grid-template-columns:230px minmax(330px,540px) 1fr;gap:40px;a
 .pf-rec-lv{flex:1;color:var(--ink)}
 .pf-rec-time{font-variant-numeric:tabular-nums;color:var(--muted)}
 .pf-rec-badge{background:var(--gold);color:var(--card);font-size:10px;border-radius:8px;padding:2px 7px;font-weight:650}
+.pf-history-controls{display:flex;gap:8px;margin-bottom:8px}
+.pf-history-controls select{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);padding:8px}
+.pf-history{display:flex;flex-direction:column;gap:6px}
+.pf-history-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--pale);border-radius:8px}
+.pf-history-row>div{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}
+.pf-history-row strong{font-size:11px;font-weight:600;color:var(--ink)}
+.pf-history-row span{font-size:11px;color:var(--muted)}
+.pf-history-row .modal-btn{padding:6px 10px;flex:none}
+.pf-preview{max-width:380px}
+.pf-preview-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));border:1px solid var(--line);margin:14px 0}
+.pf-preview-cell{aspect-ratio:1;display:grid;place-items:center;border-right:1px solid var(--line);border-bottom:1px solid var(--line);font-size:14px;color:var(--ink)}
+.pf-preview-cell:nth-child(3n){border-right:2px solid var(--ink)}
+.pf-preview-cell:nth-child(9n){border-right:0}
+.pf-preview-cell:nth-child(n+19):nth-child(-n+27),.pf-preview-cell:nth-child(n+46):nth-child(-n+54){border-bottom:2px solid var(--ink)}
+.pf-preview-actions{display:flex;justify-content:flex-end;gap:8px}
 .pf-logout{margin-top:16px;width:100%}
 .avatar-modal{max-width:320px}
 .avatar-modal h3{text-align:center}

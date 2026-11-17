@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>数独 · 静心一刻</title>
-<link rel="stylesheet" href="sudoku.css?v=26">
+  <link rel="stylesheet" href="sudoku.css?v=27">
 </head>
 <body>
 <div class="shell">
@@ -127,6 +127,8 @@
       <div><b id="pf-total">00:00</b><span>总用时</span></div>
       <div><b id="pf-best">--</b><span>最佳单关</span></div>
       <div><b id="pf-max">0</b><span>最高关卡</span></div>
+      <div><b id="pf-average">--</b><span>平均用时</span></div>
+      <div><b id="pf-attempts">0</b><span>通关次数</span></div>
     </div>
     <div class="pf-daily">
       <span id="pf-daily-txt">今日挑战：未完成</span>
@@ -136,6 +138,12 @@
     <div class="pf-ach" id="pf-ach"></div>
     <h4 class="pf-sec">最近成绩</h4>
     <div class="pf-recent" id="pf-recent"></div>
+    <h4 class="pf-sec">云端进度历史</h4>
+    <div class="pf-history-controls">
+      <select id="pf-history-level" aria-label="选择历史关卡"></select>
+      <button class="modal-btn ghost" id="pf-history-load" type="button">查看</button>
+    </div>
+    <div class="pf-history" id="pf-history"><span class="pf-empty">选择关卡查看可恢复版本</span></div>
     <button class="modal-btn ghost pf-logout" id="profile-logout">退出登录</button>
   </div>
 </div>
@@ -172,6 +180,6 @@
 </div>
 <div class="toasts" id="toasts"></div>
 <script src="sudoku-data.js?v=17"></script>
-<script src="sudoku.js?v=29"></script>
+<script src="sudoku.js?v=30"></script>
 </body>
 </html>

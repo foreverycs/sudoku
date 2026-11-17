@@ -50,15 +50,26 @@ function game_start() {
     $uid = (int)$c['uid'];
     $attemptKey = gen_uuid();
     try {
-        $pdo->prepare('INSERT INTO game_attempts (user_id, level, attempt_key) VALUES (?,?,?)')
+    $pdo->prepare('INSERT INTO game_attempts (user_id, level, attempt_key, started_at) VALUES (?,?,?,NOW())')
             ->execute(array($uid, $level, $attemptKey));
     } catch (Exception $e) {
         // 唯一键冲突极低概率，重试一次
         $attemptKey = gen_uuid();
-        $pdo->prepare('INSERT INTO game_attempts (user_id, level, attempt_key) VALUES (?,?,?)')
+        $pdo->prepare('INSERT INTO game_attempts (user_id, level, attempt_key, started_at) VALUES (?,?,?,NOW())')
             ->execute(array($uid, $level, $attemptKey));
     }
     ok(array('attempt_key' => $attemptKey, 'started_at' => time()));
+}
+
+/** POST daily/start：开始当日挑战的服务端计时 */
+function daily_start() {
+    $c = current_user();
+    ensure_security_schema();
+    $pdo = db();
+    $key = gen_uuid();
+    $pdo->prepare('INSERT INTO game_attempts (user_id, level, attempt_key, started_at) VALUES (?,0,?,NOW())')
+        ->execute(array((int)$c['uid'], $key));
+    ok(array('attempt_key' => $key, 'started_at' => time()));
 }
 
 /** 按难度给基础经验：入门20/简单30/中等40/困难50/挑战60（1-100 关，每20关一档） */
@@ -73,12 +84,14 @@ function difficulty_exp($level) {
 
 /** 用户统计（勋章判定依据） */
 function user_stats($uid) {
-    $st = db()->prepare('SELECT COUNT(DISTINCT level) AS cc, COALESCE(SUM(seconds),0) AS ts, COALESCE(MIN(seconds),0) AS bm, COALESCE(MAX(level),0) AS ml FROM game_records WHERE user_id = ?');
+    $st = db()->prepare('SELECT COUNT(DISTINCT level) AS cc, COUNT(*) AS attempts, COALESCE(SUM(seconds),0) AS ts, COALESCE(AVG(seconds),0) AS av, COALESCE(MIN(seconds),0) AS bm, COALESCE(MAX(level),0) AS ml FROM game_records WHERE user_id = ?');
     $st->execute([(int)$uid]);
     $r = $st->fetch();
     return array(
         'complete_count' => (int)$r['cc'],
+        'attempt_count'  => (int)$r['attempts'],
         'total_seconds'  => (int)$r['ts'],
+        'average_seconds'=> (int)round((float)$r['av']),
         'best_min'       => (int)$r['bm'],
         'max_level'      => (int)$r['ml'],
     );
@@ -114,30 +127,14 @@ function game_complete() {
     $uid = (int)$c['uid'];
 
     // 幂等：同 key 已结算则直接返回缓存结果
-    $st = $pdo->prepare('SELECT id, completed_at, result_json FROM game_attempts WHERE user_id = ? AND level = ? AND attempt_key = ?');
+    $st = $pdo->prepare('SELECT id, started_at, completed_at, result_json FROM game_attempts WHERE user_id = ? AND level = ? AND attempt_key = ?');
     $st->execute(array($uid, $level, $attemptKey));
     $attempt = $st->fetch();
     if ($attempt && $attempt['completed_at']) {
         $cached = json_decode($attempt['result_json'], true);
         if (is_array($cached) && isset($cached['expGain'])) return ok($cached);
     }
-    if (!$attempt) {
-        // 首次提交：创建尝试记录（唯一键防并发重复创建）
-        try {
-            $pdo->prepare('INSERT INTO game_attempts (user_id, level, attempt_key) VALUES (?,?,?)')
-                ->execute(array($uid, $level, $attemptKey));
-        } catch (Exception $e) {
-            $st = $pdo->prepare('SELECT id, completed_at, result_json FROM game_attempts WHERE user_id = ? AND level = ? AND attempt_key = ?');
-            $st->execute(array($uid, $level, $attemptKey));
-            $attempt = $st->fetch();
-            if ($attempt && $attempt['completed_at']) {
-                $cached = json_decode($attempt['result_json'], true);
-                if (is_array($cached) && isset($cached['expGain'])) return ok($cached);
-            }
-            // 插入失败且读不到行（非唯一键冲突的异常）：终止，避免无行可标记导致重复发奖
-            if (!$attempt) fail('尝试记录创建失败，请重试', 500);
-        }
-    }
+    if (!$attempt) fail('服务端尝试不存在，请重新开始本关', 409);
 
     // 校验提交棋盘 == 权威答案；失败不标记完成（允许同 key 重试修正）
     if (!validate_solution($cells, $level)) {
@@ -150,7 +147,7 @@ function game_complete() {
     try {
         $pdo->beginTransaction();
 
-        $st = $pdo->prepare('SELECT id, completed_at FROM game_attempts WHERE user_id = ? AND level = ? AND attempt_key = ? FOR UPDATE');
+        $st = $pdo->prepare('SELECT id, started_at, completed_at FROM game_attempts WHERE user_id = ? AND level = ? AND attempt_key = ? FOR UPDATE');
         $st->execute(array($uid, $level, $attemptKey));
         $lock = $st->fetch();
         if ($lock && $lock['completed_at']) {
@@ -163,6 +160,17 @@ function game_complete() {
             if (is_array($cached) && isset($cached['expGain'])) return ok($cached);
             fail('结算已处理', 409);
         }
+
+        // Serialize reward updates across distinct attempts for the same account.
+        $userLock = $pdo->prepare('SELECT id FROM users WHERE id = ? FOR UPDATE');
+        $userLock->execute(array($uid));
+
+        // 服务端耗时是下限，客户端只能提交更慢的成绩，不能伪造更快的用时
+        // MySQL 5.5 compatible; +1 second makes the lower bound conservative around second boundaries.
+        $st = $pdo->prepare('SELECT GREATEST(1, TIMESTAMPDIFF(SECOND, ?, NOW()) + 1) AS elapsed');
+        $st->execute(array($lock['started_at']));
+        $elapsedRow = $st->fetch();
+        $seconds = min(100000, max($seconds, (int)$elapsedRow['elapsed']));
 
         // 该关历史（首次 / 最佳判定）
         $st = $pdo->prepare('SELECT COUNT(*) AS cnt, COALESCE(MIN(seconds),0) AS best FROM game_records WHERE user_id = ? AND level = ?');
@@ -180,6 +188,9 @@ function game_complete() {
         // 记录通关
         $pdo->prepare('INSERT INTO game_records (user_id, level, seconds, is_record) VALUES (?,?,?,?)')
             ->execute(array($uid, $level, $seconds, $isRecord ? 1 : 0));
+        $st = $pdo->prepare('SELECT MIN(seconds) AS best_seconds FROM game_records WHERE user_id = ? AND level = ?');
+        $st->execute(array($uid, $level));
+        $bestRow = $st->fetch();
 
         // 勋章判定：INSERT IGNORE + rowCount()==1 才计点，防并发重复解锁
         $stats = user_stats($uid);
@@ -221,6 +232,9 @@ function game_complete() {
             'isRecord' => $isRecord,
             'first'    => $first,
             'newAchievements' => $newAch,
+            'seconds' => $seconds,
+            'officialSeconds' => $seconds,
+            'bestSeconds' => (int)$bestRow['best_seconds'],
         );
 
         // 标记尝试完成并缓存结果（必须在 commit 之前，事务内）
