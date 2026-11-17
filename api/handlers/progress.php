@@ -6,7 +6,8 @@ require_once __DIR__ . '/../security.php';
 
 /** GET progress 拉取当前用户全部云进度（含 revision 乐观锁版本） */
 function progress_all() {
-    $c = current_user();
+    $c = current_user();          // 认证优先（未登录 401），避免未认证请求触发 DDL
+    ensure_security_schema();     // 确保 revision 列存在（迁移与顺序无关）
     $st = db()->prepare('SELECT level, cells, notes, seconds, updated_at, COALESCE(revision,1) AS rev FROM game_progress WHERE user_id = ?');
     $st->execute(array($c['uid']));
     $rows = $st->fetchAll();
