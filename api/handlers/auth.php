@@ -78,7 +78,12 @@ function auth_me() {
 
 /** 签发 token */
 function issue_token($uid, $username, $role) {
-    return jwt_encode(['uid' => (int)$uid, 'username' => $username, 'role' => $role, 'exp' => time() + JWT_EXPIRE]);
+    $tv = 0;
+    $st = db()->prepare('SELECT token_version FROM users WHERE id = ?');
+    $st->execute([(int)$uid]);
+    $r = $st->fetch();
+    if ($r) $tv = (int)$r['token_version'];
+    return jwt_encode(['uid' => (int)$uid, 'username' => $username, 'role' => $role, 'tv' => $tv, 'exp' => time() + JWT_EXPIRE]);
 }
 
 /** 用户公开信息 */

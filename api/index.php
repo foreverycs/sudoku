@@ -33,6 +33,9 @@ if ($r === '') {
 }
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
 
+// 确保安全表/列已就位（token_version 等），须在 current_user 之前执行
+ensure_security_schema();
+
 try {
     if ($method === 'POST' && $r === 'auth/register') {
         if (!rate_limit_check('register', @$_SERVER['REMOTE_ADDR'], 5, 3600)) fail('注册频率过高', 429);
@@ -78,6 +81,21 @@ try {
     if ($method === 'GET'  && $r === 'me/stats')      return me_stats();
     if ($method === 'GET'  && $r === 'profile')       return profile_get();
     if ($method === 'PUT'  && $r === 'me/avatar')     return me_avatar_put();
+    if ($method === 'POST' && $r === 'me/password') {
+        $rateUser = current_user();
+        if (!rate_limit_check('me_password', 'uid:' . (int)$rateUser['uid'], 6, 3600)) fail('修改密码过于频繁', 429);
+        return me_password_put();
+    }
+    if ($method === 'POST' && $r === 'me/delete') {
+        $rateUser = current_user();
+        if (!rate_limit_check('me_delete', 'uid:' . (int)$rateUser['uid'], 3, 3600)) fail('删除操作过于频繁', 429);
+        return me_delete();
+    }
+    if ($method === 'GET'  && $r === 'me/export') {
+        $rateUser = current_user();
+        if (!rate_limit_check('me_export', 'uid:' . (int)$rateUser['uid'], 10, 3600)) fail('导出过于频繁', 429);
+        return me_export();
+    }
     if ($method === 'GET'  && $r === 'leaderboard')   return leaderboard();
     if ($method === 'GET'  && $r === 'daily')         return daily_get();
     if ($method === 'GET'  && $r === 'daily/history') {

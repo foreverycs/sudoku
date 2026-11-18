@@ -1285,6 +1285,47 @@
     } catch (e) { say('头像更新失败：' + e.message); }
   }
 
+  async function exportMyData() {
+    try {
+      const d = await apiCall('me/export', 'GET');
+      const blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'sudoku-export-' + ((d.user && d.user.username) || 'me') + '-' + Date.now() + '.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      say('数据已导出');
+    } catch (e) { say('导出失败：' + e.message); }
+  }
+
+  async function changePassword() {
+    const old = $('pw-old').value, n1 = $('pw-new').value, n2 = $('pw-new2').value;
+    if (n1.length < 6 || n1.length > 64) { say('新密码长度需 6-64 位'); return; }
+    if (n1 !== n2) { say('两次输入的新密码不一致'); return; }
+    try {
+      const d = await apiCall('me/password', 'POST', { old_password: old, new_password: n1 });
+      if (d.token) tokenSet(d.token);
+      $('pw-old').value = ''; $('pw-new').value = ''; $('pw-new2').value = '';
+      $('password-overlay').classList.remove('show');
+      say('密码已修改');
+    } catch (e) { say('修改失败：' + e.message); }
+  }
+
+  async function deleteAccount() {
+    const pw = $('del-password').value;
+    if (!pw) { say('请输入密码确认'); return; }
+    try {
+      await apiCall('me/delete', 'POST', { password: pw });
+      tokenSet(''); currentUser = null;
+      updateUserUI(); loadLeaderboard();
+      $('delete-overlay').classList.remove('show');
+      $('profile-overlay').classList.remove('show');
+      say('账号已删除');
+    } catch (e) { say('删除失败：' + e.message); }
+  }
+
   function bindProfile() {
     $('user-chip').onclick = e => { e.stopPropagation(); openProfile(); };
     $('quick-btn').onclick = startQuick;
@@ -1317,6 +1358,17 @@
       updateUserUI(); loadLeaderboard(); closeProfile();
       say('已退出登录，进度将仅保存在本地');
     };
+    $('me-password').onclick = () => { $('pw-old').value = ''; $('pw-new').value = ''; $('pw-new2').value = ''; $('password-overlay').classList.add('show'); };
+    $('me-export').onclick = exportMyData;
+    $('me-delete').onclick = () => { $('del-password').value = ''; $('delete-overlay').classList.add('show'); };
+    $('password-close').onclick = () => $('password-overlay').classList.remove('show');
+    $('delete-close').onclick = () => $('delete-overlay').classList.remove('show');
+    $('pw-submit').onclick = changePassword;
+    $('del-submit').onclick = deleteAccount;
+    $('password-overlay').addEventListener('click', e => { if (e.target === $('password-overlay')) $('password-overlay').classList.remove('show'); });
+    $('delete-overlay').addEventListener('click', e => { if (e.target === $('delete-overlay')) $('delete-overlay').classList.remove('show'); });
+    $('password-overlay').addEventListener('keydown', e => { if (e.key === 'Enter') changePassword(); });
+    $('delete-overlay').addEventListener('keydown', e => { if (e.key === 'Enter') deleteAccount(); });
   }
 
   function updateUserUI() {

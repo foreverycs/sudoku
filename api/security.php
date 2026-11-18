@@ -57,6 +57,17 @@ function ensure_security_schema() {
     } catch (Exception $e) {
         // information_schema 查询失败则忽略，后续写入按 COALESCE(revision,1) 兜底
     }
+
+    // token_version 列（改密码后使旧 JWT 即时失效）
+    try {
+        $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "users" AND COLUMN_NAME = "token_version"');
+        $st->execute();
+        if ((int)$st->fetchColumn() === 0) {
+            $pdo->exec('ALTER TABLE users ADD COLUMN token_version INT UNSIGNED NOT NULL DEFAULT 0');
+        }
+    } catch (Exception $e) {
+        // 列已存在或查询失败则忽略
+    }
 }
 
 /**
