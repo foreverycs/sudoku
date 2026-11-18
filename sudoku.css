@@ -51,7 +51,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,"PingFa
 .theme-btn{width:34px;height:34px;border:1px solid var(--line);background:var(--card);border-radius:50%;cursor:pointer;font-size:15px;display:grid;place-items:center;color:var(--ink);transition:.15s;padding:0}
 .theme-btn:hover{border-color:var(--hover-border)}
 
-main{display:grid;grid-template-columns:230px minmax(330px,540px) 1fr;gap:40px;align-items:start;padding:44px 30px}
+main{display:grid;grid-template-columns:230px minmax(330px,540px) 1fr;gap:40px;align-items:start;padding:24px 30px}
 .board-wrap{max-width:520px;width:100%;margin:0 auto}
 
 /* ===== 排行榜 ===== */
