@@ -1100,6 +1100,7 @@
   }
 
   let profileData = null;
+  let dailyCal = null;
 
   async function openProfile() {
     if (!currentUser) return;
@@ -1111,6 +1112,8 @@
       if (!$('pf-history-level').options.length) $('pf-history-level').innerHTML = Array.from({ length: N }, (_, i) => '<option value="' + (i + 1) + '">第 ' + (i + 1) + ' 关</option>').join('');
       $('pf-history-level').value = String(level);
       loadProgressHistory();
+      dailyCalInit();
+      loadDailyCalendar();
     } catch (e) { say('加载主页失败：' + e.message); }
   }
   function closeProfile() { $('profile-overlay').classList.remove('show'); }
@@ -1150,10 +1153,70 @@
       : '<span class="pf-empty">暂无完成记录</span>';
   }
 
+  function dailyCalInit() {
+    const now = new Date();
+    dailyCal = { y: now.getFullYear(), m: now.getMonth() + 1 };
+  }
+
+  async function loadDailyCalendar() {
+    if (!currentUser) return;
+    const grid = $('cal-grid');
+    if (!dailyCal) dailyCalInit();
+    grid.innerHTML = '<span class="pf-empty">加载中…</span>';
+    try {
+      const d = await apiCall('daily/history&year=' + dailyCal.y + '&month=' + dailyCal.m, 'GET');
+      renderDailyCalendar(d);
+    } catch (e) { grid.innerHTML = '<span class="pf-empty">加载失败：' + esc(e.message) + '</span>'; }
+  }
+
+  function renderDailyCalendar(d) {
+    const y = d.year, m = d.month;
+    $('cal-title').textContent = y + '年' + m + '月';
+    const days = d.days || {};
+    const firstDow = (new Date(y, m - 1, 1).getDay() + 6) % 7; // 0=周一
+    const dim = new Date(y, m, 0).getDate();
+    const now = new Date();
+    const todayY = now.getFullYear(), todayM = now.getMonth() + 1, todayD = now.getDate();
+    let cells = '';
+    for (let i = 0; i < firstDow; i++) cells += '<span class="pf-cal-day blank"></span>';
+    for (let day = 1; day <= dim; day++) {
+      const sec = days[day];
+      const isToday = (y === todayY && m === todayM && day === todayD);
+      const isFuture = (y > todayY) || (y === todayY && m > todayM) || (y === todayY && m === todayM && day > todayD);
+      let cls = 'pf-cal-day';
+      if (sec !== undefined) cls += ' done';
+      if (isToday) cls += ' today';
+      if (isFuture) cls += ' future';
+      const title = sec !== undefined ? ('用时 ' + fmtClock(sec)) : '';
+      cells += '<button type="button" class="' + cls + '"' + (title ? ' title="' + title + '"' : '')
+        + ' data-day="' + day + '"' + (sec !== undefined ? ' data-sec="' + sec + '"' : '') + '>' + day + '</button>';
+    }
+    const trail = (7 - ((firstDow + dim) % 7)) % 7;
+    for (let i = 0; i < trail; i++) cells += '<span class="pf-cal-day blank"></span>';
+    $('cal-grid').innerHTML = cells;
+
+    const s = d.summary || {};
+    $('cal-sum').textContent = '累计 ' + (s.total || 0) + ' 天 · 当前连胜 ' + (s.currentStreak || 0)
+      + ' · 最长连胜 ' + (s.longestStreak || 0) + ' · 最快 ' + (s.best ? fmtClock(s.best) : '--');
+  }
+
+  function dailyCalNav(delta) {
+    if (!dailyCal) dailyCalInit();
+    dailyCal.m += delta;
+    while (dailyCal.m < 1) { dailyCal.m += 12; dailyCal.y--; }
+    while (dailyCal.m > 12) { dailyCal.m -= 12; dailyCal.y++; }
+    loadDailyCalendar();
+  }
+
+  function dailyCalTap(btn) {
+    const day = btn.getAttribute('data-day'), sec = btn.getAttribute('data-sec');
+    if (!day || !sec) return;
+    say(dailyCal.y + '年' + dailyCal.m + '月' + day + '日：用时 ' + fmtClock(+sec));
+  }
+
   async function loadProgressHistory() {
     if (!currentUser) return;
-    const lv = clamp(parseInt($('pf-history-level').value, 10) || level, 1, N);
-    const root = $('pf-history');
+    const lv = clamp(parseInt($('pf-history-level').value, 10) || level, 1, N);    const root = $('pf-history');
     root.innerHTML = '<span class="pf-empty">加载中…</span>';
     try {
       const d = await apiCall('progress/' + lv + '/history', 'GET');
@@ -1234,6 +1297,12 @@
     $('pf-history').onclick = e => {
       const btn = e.target.closest ? e.target.closest('[data-history-id]') : null;
       if (btn) previewProgressHistory(btn);
+    };
+    $('cal-prev').onclick = () => dailyCalNav(-1);
+    $('cal-next').onclick = () => dailyCalNav(1);
+    $('cal-grid').onclick = e => {
+      const btn = e.target.closest ? e.target.closest('[data-sec]') : null;
+      if (btn) dailyCalTap(btn);
     };
     $('profile-overlay').addEventListener('click', e => { if (e.target === $('profile-overlay')) closeProfile(); });
     $('pf-avatar').onclick = openAvatarPicker;

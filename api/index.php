@@ -80,6 +80,11 @@ try {
     if ($method === 'PUT'  && $r === 'me/avatar')     return me_avatar_put();
     if ($method === 'GET'  && $r === 'leaderboard')   return leaderboard();
     if ($method === 'GET'  && $r === 'daily')         return daily_get();
+    if ($method === 'GET'  && $r === 'daily/history') {
+        $rateUser = current_user();
+        if (!rate_limit_check('daily_history', 'uid:' . (int)$rateUser['uid'], 60, 60)) fail('历史查询过于频繁', 429);
+        return daily_history();
+    }
     if ($method === 'POST' && $r === 'daily/complete') {
         $rateUser = current_user();
         if (!rate_limit_check('daily_complete', 'uid:' . (int)$rateUser['uid'], 2, 86400)) fail('每日挑战完成频率过高', 429);

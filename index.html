@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>数独 · 静心一刻</title>
-  <link rel="stylesheet" href="sudoku.css?v=28">
+  <link rel="stylesheet" href="sudoku.css?v=29">
 </head>
 <body>
 <div class="shell">
@@ -134,6 +134,17 @@
       <span id="pf-daily-txt">今日挑战：未完成</span>
       <span id="pf-streak">连胜 0 天</span>
     </div>
+    <h4 class="pf-sec">每日挑战日历</h4>
+    <div class="pf-cal">
+      <div class="pf-cal-head">
+        <button class="pf-cal-nav" id="cal-prev" type="button" aria-label="上个月">‹</button>
+        <span class="pf-cal-title" id="cal-title">—</span>
+        <button class="pf-cal-nav" id="cal-next" type="button" aria-label="下个月">›</button>
+      </div>
+      <div class="pf-cal-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+      <div class="pf-cal-grid" id="cal-grid"></div>
+      <div class="pf-cal-sum" id="cal-sum">累计 0 天</div>
+    </div>
     <h4 class="pf-sec">勋章 <em id="pf-ach-count">0/11</em></h4>
     <div class="pf-ach" id="pf-ach"></div>
     <h4 class="pf-sec">最近成绩</h4>
@@ -180,6 +191,6 @@
 </div>
 <div class="toasts" id="toasts"></div>
 <script src="sudoku-data.js?v=17"></script>
-<script src="sudoku.js?v=30"></script>
+<script src="sudoku.js?v=32"></script>
 </body>
 </html>

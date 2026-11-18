@@ -167,6 +167,56 @@ function daily_get() {
     ));
 }
 
+/** GET daily/history：按月返回每日挑战完成情况 + 汇总（累计/最快/当前连胜/最长连胜） */
+function daily_history() {
+    $c = current_user();
+    $uid = (int)$c['uid'];
+    $y = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
+    $m = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('n');
+    if ($y < 2020 || $y > 2100) fail('年份无效');
+    if ($m < 1 || $m > 12) fail('月份无效');
+    $from = sprintf('%04d-%02d-01', $y, $m);
+    $to = date('Y-m-t', strtotime($from));
+    $pdo = db();
+
+    // 当月完成日（day → seconds）
+    $st = $pdo->prepare('SELECT DAY(date) AS d, seconds FROM daily_records WHERE user_id = ? AND date BETWEEN ? AND ? ORDER BY d');
+    $st->execute(array($uid, $from, $to));
+    $days = array();
+    foreach ($st->fetchAll() as $r) $days[(int)$r['d']] = (int)$r['seconds'];
+
+    // 汇总：累计 / 最快
+    $st = $pdo->prepare('SELECT COUNT(*) AS total, MIN(seconds) AS best FROM daily_records WHERE user_id = ?');
+    $st->execute(array($uid));
+    $s = $st->fetch();
+    $total = (int)$s['total'];
+    $best = ($s['best'] === null) ? null : (int)$s['best'];
+
+    // 最长连胜：日期升序逐日比对
+    $st = $pdo->prepare('SELECT date FROM daily_records WHERE user_id = ? ORDER BY date ASC');
+    $st->execute(array($uid));
+    $longest = 0; $cur = 0; $prev = null;
+    foreach ($st->fetchAll() as $r) {
+        $ds = $r['date'];
+        if ($prev !== null && $ds === date('Y-m-d', strtotime($prev . ' +1 day'))) $cur++;
+        else $cur = 1;
+        if ($cur > $longest) $longest = $cur;
+        $prev = $ds;
+    }
+
+    ok(array(
+        'year'    => $y,
+        'month'   => $m,
+        'days'    => $days,
+        'summary' => array(
+            'total'          => $total,
+            'best'           => $best,
+            'currentStreak'  => daily_streak($uid),
+            'longestStreak'  => $longest,
+        ),
+    ));
+}
+
 /** 验证每日挑战提交棋盘 == 权威解 */
 function validate_daily_solution($submittedCells, $answer) {
     if (strlen($submittedCells) !== 81 || strlen($answer) !== 81) return false;
