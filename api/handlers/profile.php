@@ -92,8 +92,18 @@ function me_export() {
     $st->execute([$uid]);
     $historyCount = (int)$st->fetch()['c'];
 
+    $st = $pdo->prepare('SELECT level, cells, notes, seconds, revision, created_at FROM game_progress_history WHERE user_id = ? ORDER BY level, id');
+    $st->execute([$uid]);
+    $history = $st->fetchAll();
+
+    $st = $pdo->prepare('SELECT level, attempt_key, started_at, completed_at, is_valid, result_json FROM game_attempts WHERE user_id = ? ORDER BY id');
+    $st->execute([$uid]);
+    $attempts = $st->fetchAll();
+    foreach ($attempts as &$a) { $a['is_valid'] = (bool)$a['is_valid']; }
+    unset($a);
+
     ok(array(
-        'version'      => 1,
+        'version'      => 2,
         'exportedAt'   => date('c'),
         'user'         => user_pub($uid),
         'stats'        => user_stats($uid),
@@ -101,6 +111,8 @@ function me_export() {
         'records'      => $records,
         'daily'        => $daily,
         'achievements' => $achievements,
+        'history'      => $history,
+        'attempts'     => $attempts,
         'historyCount' => $historyCount,
     ));
 }

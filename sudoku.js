@@ -64,6 +64,7 @@
   const tokenGet = () => { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; } };
   const tokenSet = t => { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* 隐私模式忽略 */ } };
   let currentUser = null;
+  let leaderScope = 'all';
   const cellsToStr = a => a.map(x => x | 0).join('');
   const notesToObj = n => { const o = {}; for (let i = 0; i < n.length; i++) { const s = n[i]; const arr = (s instanceof Set) ? [...s] : (Array.isArray(s) ? s : []); if (arr.length) o[i] = arr; } return o; };
   const strToCells = s => String(s || '').split('').map(x => { x = +x; return (x >= 0 && x <= 9) ? x : 0; });
@@ -575,25 +576,30 @@
     if (!el) return;
     const cur = lv || level || 1;
     const intro = $('leader-intro');
-    if (intro) intro.textContent = '第 ' + cur + ' 关 · 用时越短越靠前';
+    const friendsScope = leaderScope === 'friends';
+    if (intro) intro.textContent = '第 ' + cur + ' 关 · 用时越短越靠前' + (friendsScope ? ' · 好友' : '');
+    const uid = currentUser ? currentUser.id : -1;
+    const rowHtml = (u, i, extraTag) => {
+      const me = u.id === uid;
+      const ava = avatarHtml(u);
+      return '<div class="lb-row' + (me ? ' me' : '') + '">'
+        + '<span class="lb-rank">' + (i + 1) + '</span>'
+        + '<span class="lb-ava">' + ava + '</span>'
+        + '<span class="lb-info"><span class="lb-name">' + esc(u.nickname || u.username) + (extraTag || '') + '</span>'
+        + '<span class="lb-meta"><span>⏱ ' + fmtClock(u.best) + '</span></span></span>'
+        + '</div>';
+    };
     try {
-      const d = await apiCall('leaderboard&level=' + cur + '&limit=15', 'GET');
+      const route = friendsScope ? 'leaderboard/friends&level=' + cur + '&limit=15' : 'leaderboard&level=' + cur + '&limit=15';
+      const d = await apiCall(route, 'GET');
       const list = d.ranking || [];
-      if (!list.length) { el.innerHTML = '<div class="leader-loading">暂无上榜用户</div>'; return; }
-      const uid = currentUser ? currentUser.id : -1;
-      const rowHtml = (u, i, extraTag) => {
-        const me = u.id === uid;
-        const ava = avatarHtml(u);
-        return '<div class="lb-row' + (me ? ' me' : '') + '">'
-          + '<span class="lb-rank">' + (i + 1) + '</span>'
-          + '<span class="lb-ava">' + ava + '</span>'
-          + '<span class="lb-info"><span class="lb-name">' + esc(u.nickname || u.username) + (extraTag || '') + '</span>'
-          + '<span class="lb-meta"><span>⏱ ' + fmtClock(u.best) + '</span></span></span>'
-          + '</div>';
-      };
+      if (!list.length) {
+        el.innerHTML = '<div class="leader-loading">' + (friendsScope ? '暂无好友上榜，先添加好友吧' : '暂无上榜用户') + '</div>';
+        return;
+      }
       let html = list.map((u, i) => rowHtml(u, i)).join('');
-      // 「我的排名」固定底行：当前登录用户不在 top 时显示
-      if (d.my && d.my.rank) {
+      // 「我的排名」固定底行：当前登录用户不在 top 时显示（仅全站榜）
+      if (!friendsScope && d.my && d.my.rank) {
         html += '<div class="lb-sep">···</div>'
           + rowHtml(d.my, d.my.rank - 1, '<small class="lb-mytag">我的排名</small>');
       }
@@ -601,6 +607,59 @@
     } catch (e) {
       el.innerHTML = '<div class="leader-loading">排行榜加载失败</div>';
     }
+  }
+
+  function setLeaderScope(scope) {
+    if (scope === 'friends' && !currentUser) { say('请先登录查看好友榜'); return; }
+    leaderScope = scope;
+    const btns = $('leader-scope').querySelectorAll('button');
+    for (const b of btns) b.classList.toggle('active', b.getAttribute('data-scope') === scope);
+    loadLeaderboard();
+  }
+
+  async function loadFriendList() {
+    const root = $('friend-list');
+    if (!currentUser) { root.innerHTML = '<div class="friend-empty">请先登录</div>'; return; }
+    root.innerHTML = '<div class="friend-empty">加载中…</div>';
+    try {
+      const d = await apiCall('friends', 'GET');
+      const list = d.friends || [];
+      if (!list.length) { root.innerHTML = '<div class="friend-empty">还没有好友，输入用户名添加</div>'; return; }
+      root.innerHTML = list.map(f => '<div class="friend-item">'
+        + '<span class="lb-ava">' + avatarHtml(f) + '</span>'
+        + '<span class="fi-info"><span class="fi-name">' + esc(f.nickname || f.username) + '</span>'
+        + '<span class="fi-meta">@' + esc(f.username) + ' · Lv.' + (f.level || 1) + '</span></span>'
+        + '<button type="button" class="modal-btn ghost" data-fid="' + f.id + '">移除</button>'
+        + '</div>').join('');
+    } catch (e) { root.innerHTML = '<div class="friend-empty">加载失败：' + esc(e.message) + '</div>'; }
+  }
+
+  function openFriends() {
+    if (!currentUser) { say('请先登录后管理好友'); return; }
+    $('friends-overlay').classList.add('show');
+    loadFriendList();
+  }
+
+  async function addFriend() {
+    const input = $('friend-username');
+    const name = input.value.trim();
+    if (!name) { say('请输入用户名'); return; }
+    try {
+      await apiCall('friends/add', 'POST', { username: name });
+      input.value = '';
+      loadFriendList();
+      if (leaderScope === 'friends') loadLeaderboard();
+      say('已添加好友');
+    } catch (e) { say('添加失败：' + e.message); }
+  }
+
+  async function removeFriend(fid) {
+    try {
+      await apiCall('friends/remove', 'POST', { id: fid });
+      loadFriendList();
+      if (leaderScope === 'friends') loadLeaderboard();
+      say('已移除好友');
+    } catch (e) { say('移除失败：' + e.message); }
   }
 
   // ===== 每日挑战（阶段七） =====
@@ -1326,6 +1385,22 @@
     } catch (e) { say('删除失败：' + e.message); }
   }
 
+  function bindFriends() {
+    $('leader-scope').addEventListener('click', e => {
+      const btn = e.target.closest ? e.target.closest('[data-scope]') : null;
+      if (btn) setLeaderScope(btn.getAttribute('data-scope'));
+    });
+    $('friend-manage').onclick = openFriends;
+    $('friends-close').onclick = () => $('friends-overlay').classList.remove('show');
+    $('friend-add-btn').onclick = addFriend;
+    $('friend-username').addEventListener('keydown', e => { if (e.key === 'Enter') addFriend(); });
+    $('friend-list').onclick = e => {
+      const btn = e.target.closest ? e.target.closest('[data-fid]') : null;
+      if (btn) removeFriend(+btn.getAttribute('data-fid'));
+    };
+    $('friends-overlay').addEventListener('click', e => { if (e.target === $('friends-overlay')) $('friends-overlay').classList.remove('show'); });
+  }
+
   function bindProfile() {
     $('user-chip').onclick = e => { e.stopPropagation(); openProfile(); };
     $('quick-btn').onclick = startQuick;
@@ -1542,6 +1617,7 @@
   bindAuth();
   bindShare();
   bindProfile();
+  bindFriends();
   initAuth();
   loadLeaderboard();
   loadLevel(level);

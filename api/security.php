@@ -47,6 +47,17 @@ function ensure_security_schema() {
         CONSTRAINT fk_history_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
+    // 双向好友（user_a < user_b 唯一对）
+    $pdo->exec('CREATE TABLE IF NOT EXISTS friends (
+        id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        user_a     INT UNSIGNED NOT NULL,
+        user_b     INT UNSIGNED NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_pair (user_a, user_b),
+        CONSTRAINT fk_friend_a FOREIGN KEY (user_a) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_friend_b FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+
     // revision 列（MySQL/MariaDB 通用：先查 information_schema 再 ALTER）
     try {
         $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "game_progress" AND COLUMN_NAME = "revision"');

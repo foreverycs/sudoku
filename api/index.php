@@ -16,6 +16,7 @@ require_once __DIR__ . '/handlers/progress.php';
 require_once __DIR__ . '/handlers/game.php';
 require_once __DIR__ . '/handlers/daily.php';
 require_once __DIR__ . '/handlers/profile.php';
+require_once __DIR__ . '/handlers/friends.php';
 require_once __DIR__ . '/handlers/admin.php';
 
 // CORS
@@ -97,6 +98,26 @@ try {
         return me_export();
     }
     if ($method === 'GET'  && $r === 'leaderboard')   return leaderboard();
+    if ($method === 'GET'  && $r === 'leaderboard/friends') {
+        $rateUser = current_user();
+        if (!rate_limit_check('lb_friends', 'uid:' . (int)$rateUser['uid'], 60, 60)) fail('查询过于频繁', 429);
+        return leaderboard_friends();
+    }
+    if ($method === 'GET'  && $r === 'friends') {
+        $rateUser = current_user();
+        if (!rate_limit_check('friends_list', 'uid:' . (int)$rateUser['uid'], 60, 60)) fail('查询过于频繁', 429);
+        return friends_list();
+    }
+    if ($method === 'POST' && $r === 'friends/add') {
+        $rateUser = current_user();
+        if (!rate_limit_check('friends_add', 'uid:' . (int)$rateUser['uid'], 30, 3600)) fail('操作过于频繁', 429);
+        return friends_add();
+    }
+    if ($method === 'POST' && $r === 'friends/remove') {
+        $rateUser = current_user();
+        if (!rate_limit_check('friends_remove', 'uid:' . (int)$rateUser['uid'], 60, 3600)) fail('操作过于频繁', 429);
+        return friends_remove();
+    }
     if ($method === 'GET'  && $r === 'daily')         return daily_get();
     if ($method === 'GET'  && $r === 'daily/history') {
         $rateUser = current_user();

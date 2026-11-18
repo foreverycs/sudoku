@@ -57,6 +57,13 @@ main{display:grid;grid-template-columns:230px minmax(330px,540px) 1fr;gap:40px;a
 /* ===== 排行榜 ===== */
 .leader{padding-top:15px;position:sticky;top:20px;align-self:start}
 .leader h3{font-size:13px;font-weight:600;margin:0 0 6px}
+.leader-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.leader-head h3{margin:0}
+.friend-manage-btn{border:1px solid var(--line);background:var(--card);color:var(--green);border-radius:14px;padding:3px 10px;font-size:11px;cursor:pointer;transition:.15s;font-family:inherit}
+.friend-manage-btn:hover{border-color:var(--hover-border);background:var(--pale)}
+.leader-scope{display:inline-flex;background:var(--ghost-bg);border-radius:10px;padding:3px;margin-bottom:10px}
+.leader-scope button{border:0;background:none;padding:5px 12px;border-radius:8px;font-size:11px;color:var(--muted);cursor:pointer;font-family:inherit}
+.leader-scope button.active{background:var(--card);color:var(--green);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .leader-intro{font-size:11px;color:var(--muted);margin:0 0 16px}
 .leader-list{display:flex;flex-direction:column;gap:8px}
 .leader-loading{font-size:12px;color:var(--muted);padding:8px 0}
@@ -249,6 +256,18 @@ main{display:grid;grid-template-columns:230px minmax(330px,540px) 1fr;gap:40px;a
 .avatar-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:14px}
 .avatar-opt{aspect-ratio:1;border:1px solid var(--line);background:var(--pale);border-radius:12px;font-size:24px;cursor:pointer;display:grid;place-items:center;transition:.15s}
 .avatar-opt:hover{border-color:var(--green);transform:scale(1.06)}
+.friend-add{display:flex;gap:8px;margin-bottom:12px}
+.friend-add .auth-input{flex:1;margin-bottom:0}
+.friend-add .modal-btn{flex:none;padding:11px 16px}
+.friend-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto}
+.friend-empty{font-size:12px;color:var(--muted);text-align:center;padding:10px 0}
+.friend-item{display:flex;align-items:center;gap:9px;background:var(--pale);border-radius:10px;padding:8px 10px}
+.friend-item .lb-ava{width:30px;height:30px}
+.friend-item .fi-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.friend-item .fi-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.friend-item .fi-meta{font-size:11px;color:var(--muted)}
+.friend-item .modal-btn{flex:none;padding:5px 10px;font-size:11px}
+.friend-item .modal-btn.ghost{background:var(--conflict-bg);color:var(--red)}
 
 /* ===== 快速对局卡片（阶段⑤） ===== */
 .quick-card .daily-title{color:var(--green)}
