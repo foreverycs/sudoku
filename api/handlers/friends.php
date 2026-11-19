@@ -75,11 +75,7 @@ function leaderboard_friends() {
     $pdo = db();
 
     $ids = friend_ids($uid);
-    if (!$ids) {
-        ok(array('ranking' => array(), 'count' => 0, 'my' => null, 'level' => $level));
-        return;
-    }
-    $ids[] = $uid; // 含自己
+    $ids[] = $uid; // 好友榜始终包含本人，即使当前没有好友
     $marks = implode(',', array_fill(0, count($ids), '?'));
     $st = $pdo->prepare(
         'SELECT u.id, u.username, u.nickname, u.avatar, MIN(gr.seconds) AS best'
@@ -94,8 +90,31 @@ function leaderboard_friends() {
         $r['best'] = ($r['best'] !== null) ? (int)$r['best'] : null;
     }
     unset($r);
-    $rows = array_filter($rows, 'leader_has_best');
+    $rows = array_values(array_filter($rows, 'leader_has_best'));
     usort($rows, 'leader_sort');
-    $rows = array_slice($rows, 0, $limit);
-    ok(array('ranking' => $rows, 'count' => count($rows), 'my' => null, 'level' => $level));
+
+    $my = null;
+    foreach ($rows as $i => $r) {
+        if ((int)$r['id'] === $uid) {
+            $my = array(
+                'rank' => $i + 1,
+                'id' => (int)$r['id'],
+                'username' => $r['username'],
+                'nickname' => $r['nickname'],
+                'avatar' => $r['avatar'],
+                'best' => $r['best'],
+            );
+            break;
+        }
+    }
+    $inTop = false;
+    foreach (array_slice($rows, 0, $limit) as $r) {
+        if ((int)$r['id'] === $uid) { $inTop = true; break; }
+    }
+    ok(array(
+        'ranking' => array_slice($rows, 0, $limit),
+        'count' => min(count($rows), $limit),
+        'my' => $inTop ? null : $my,
+        'level' => $level,
+    ));
 }

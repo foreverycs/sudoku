@@ -598,8 +598,8 @@
         return;
       }
       let html = list.map((u, i) => rowHtml(u, i)).join('');
-      // 「我的排名」固定底行：当前登录用户不在 top 时显示（仅全站榜）
-      if (!friendsScope && d.my && d.my.rank) {
+      // 当前用户不在 top 时固定显示底行，好友榜和全站榜保持一致
+      if (d.my && d.my.rank) {
         html += '<div class="lb-sep">···</div>'
           + rowHtml(d.my, d.my.rank - 1, '<small class="lb-mytag">我的排名</small>');
       }
@@ -1378,7 +1378,7 @@
     try {
       await apiCall('me/delete', 'POST', { password: pw });
       tokenSet(''); currentUser = null;
-      updateUserUI(); loadLeaderboard();
+      updateUserUI(); setLeaderScope('all');
       $('delete-overlay').classList.remove('show');
       $('profile-overlay').classList.remove('show');
       say('账号已删除');
@@ -1430,7 +1430,7 @@
     };
     $('profile-logout').onclick = () => {
       tokenSet(''); currentUser = null;
-      updateUserUI(); loadLeaderboard(); closeProfile();
+      updateUserUI(); setLeaderScope('all'); closeProfile();
       say('已退出登录，进度将仅保存在本地');
     };
     $('me-password').onclick = () => { $('pw-old').value = ''; $('pw-new').value = ''; $('pw-new2').value = ''; $('password-overlay').classList.add('show'); };
@@ -1540,6 +1540,7 @@
       if (err.status === 401) tokenSet('');
       currentUser = null;
       updateUserUI();
+      setLeaderScope('all');
     }
   }
 
