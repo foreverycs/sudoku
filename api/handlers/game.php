@@ -306,21 +306,17 @@ function leaderboard() {
     if ($level < 1) $level = 1;
     if ($level > 100) $level = 100;
     $pdo = db();
+    $bestSql = 'SELECT user_id, MIN(seconds) AS best FROM game_records WHERE level = ? GROUP BY user_id';
     $st = $pdo->prepare(
-        'SELECT u.id, u.username, u.nickname, u.avatar, MIN(gr.seconds) AS best'
-        . ' FROM users u LEFT JOIN game_records gr ON gr.user_id = u.id AND gr.level = ?'
+        'SELECT u.id, u.username, u.nickname, u.avatar, b.best'
+        . ' FROM (' . $bestSql . ') b JOIN users u ON u.id = b.user_id'
         . ' WHERE u.role = "user" AND u.status = 1'
-        . ' GROUP BY u.id, u.username, u.nickname, u.avatar'
+        . ' ORDER BY b.best ASC, u.id ASC LIMIT ' . $limit
     );
-    $st->execute([$level]);
+    $st->execute(array($level));
     $rows = $st->fetchAll();
-    foreach ($rows as &$r) {
-        $r['best'] = ($r['best'] !== null) ? (int)$r['best'] : null;
-    }
+    foreach ($rows as &$r) $r['best'] = (int)$r['best'];
     unset($r);
-    $rows = array_filter($rows, 'leader_has_best');
-    usort($rows, 'leader_sort');
-    $rows = array_slice($rows, 0, $limit);
     // 当前用户排名（可选，未登录则忽略）
     $my = null;
     $token = bearer_token();
@@ -331,26 +327,22 @@ function leaderboard() {
             $inTop = false;
             foreach ($rows as $r) { if ((int)$r['id'] === $uid) { $inTop = true; break; } }
             if (!$inTop) {
-                $all = $pdo->prepare(
-                    'SELECT u.id, u.username, u.nickname, u.avatar, MIN(gr.seconds) AS best'
-                    . ' FROM users u LEFT JOIN game_records gr ON gr.user_id = u.id AND gr.level = ?'
-                    . ' WHERE u.role = "user" AND u.status = 1'
-                    . ' GROUP BY u.id, u.username, u.nickname, u.avatar'
+                $meSt = $pdo->prepare(
+                    'SELECT u.id, u.username, u.nickname, u.avatar, b.best'
+                    . ' FROM (' . $bestSql . ') b JOIN users u ON u.id = b.user_id'
+                    . ' WHERE u.id = ? AND u.role = "user" AND u.status = 1'
                 );
-                $all->execute([$level]);
-                $all = $all->fetchAll();
-                foreach ($all as &$a2) { $a2['best'] = ($a2['best'] !== null) ? (int)$a2['best'] : null; }
-                unset($a2);
-                $all = array_filter($all, 'leader_has_best');
-                usort($all, 'leader_sort');
-                $rank = 0;
-                foreach ($all as $i => $r) {
-                    if ((int)$r['id'] === $uid) { $rank = $i + 1; break; }
-                }
-                if ($rank > 0) {
-                    $me = $all[$rank - 1];
+                $meSt->execute(array($level, $uid));
+                $me = $meSt->fetch();
+                if ($me) {
+                    $me['best'] = (int)$me['best'];
+                    $rankSt = $pdo->prepare(
+                        'SELECT COUNT(*) + 1 FROM (' . $bestSql . ') b JOIN users u ON u.id = b.user_id'
+                        . ' WHERE u.role = "user" AND u.status = 1 AND (b.best < ? OR (b.best = ? AND u.id < ?))'
+                    );
+                    $rankSt->execute(array($level, $me['best'], $me['best'], $uid));
                     $my = array(
-                        'rank' => $rank,
+                        'rank' => (int)$rankSt->fetchColumn(),
                         'id' => (int)$me['id'],
                         'username' => $me['username'],
                         'nickname' => $me['nickname'],

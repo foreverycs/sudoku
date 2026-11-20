@@ -58,6 +58,15 @@ function ensure_security_schema() {
         CONSTRAINT fk_friend_b FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
+    // Optional index for per-level best-time aggregation in leaderboards.
+    try {
+        $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "game_records" AND INDEX_NAME = "idx_records_level_user_seconds"');
+        $st->execute();
+        if ((int)$st->fetchColumn() === 0) $pdo->exec('CREATE INDEX idx_records_level_user_seconds ON game_records (level, user_id, seconds)');
+    } catch (Exception $e) {
+        // Ranking remains correct without the optional performance index.
+    }
+
     // revision 列（MySQL/MariaDB 通用：先查 information_schema 再 ALTER）
     try {
         $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "game_progress" AND COLUMN_NAME = "revision"');
@@ -87,8 +96,10 @@ function ensure_security_schema() {
  * 返回 true=放行，false=超限。
  */
 function rate_limit_check($action, $identifier, $maxCount = 5, $windowSeconds = 3600) {
-    $dir = __DIR__ . '/cache/rate';
-    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    $dir = defined('PRIVATE_DATA_DIR') ? rtrim(PRIVATE_DATA_DIR, '/\\') . '/rate' : '';
+    if ($dir === '') $dir = rtrim(sys_get_temp_dir(), '/\\') . '/sudoku-rate-' . substr(sha1(__DIR__), 0, 12);
+    if (!is_dir($dir)) @mkdir($dir, 0700, true);
+    @chmod($dir, 0700);
     $key = md5((string)$action . ':' . (string)$identifier);
     $file = $dir . '/' . $key . '.lock';
     $now = time();

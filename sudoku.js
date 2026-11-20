@@ -2,7 +2,10 @@
   'use strict';
   // ?reset=1 清空本地进度（保留登录 token），用于异常恢复/重新开始
   if (new URLSearchParams(location.search).has('reset')) {
-    try { localStorage.removeItem('quiet-sudoku'); } catch { /* 忽略 */ }
+    try {
+      localStorage.removeItem('quiet-sudoku');
+      Object.keys(localStorage).filter(k => k.indexOf('quiet-sudoku-user-') === 0 || k.indexOf('quiet-sudoku-daily-') === 0).forEach(k => localStorage.removeItem(k));
+    } catch { /* 忽略 */ }
     location.replace(location.pathname + '?v=' + Date.now());
     return;
   }
@@ -10,9 +13,17 @@
   const N = DATA.length || 100;
   const labels = ['晨间练习', '轻松起步', '数字漫步', '午后片刻', '静心推理', '思路交汇', '专注时分', '层层深入', '终极挑战', '大师之路'];
 
+  let localStorageRef = null;
+  try { localStorageRef = window.localStorage; } catch (e) { /* storage disabled */ }
+  const safeLocalStorage = {
+    getItem(key) { try { return localStorageRef ? localStorageRef.getItem(key) : null; } catch (e) { return null; } },
+    setItem(key, value) { try { if (localStorageRef) localStorageRef.setItem(key, value); } catch (e) { /* storage disabled */ } }
+  };
+  const storage = window.SudokuStorage.create(safeLocalStorage);
+  let saveKey = storage.guestKey;
   const store = {
-    read() { try { return JSON.parse(localStorage.getItem('quiet-sudoku') || '{}'); } catch { return {}; } },
-    write(d) { try { localStorage.setItem('quiet-sudoku', JSON.stringify(d)); } catch { /* 禁用时不保存 */ } }
+    read(key) { return key === 'soundOn' ? storage.settings.read() : storage.read(saveKey); },
+    write(d, key) { return key === 'soundOn' ? storage.settings.write({ soundOn: d }) : storage.write(d, saveKey); }
   };
   let saved = store.read();
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -27,7 +38,27 @@
 
   // ===== 每日挑战（dailyMode 复用棋盘，不写 saved.boards / 不占 completed） =====
   const DAILY_KEY = 'quiet-sudoku-daily';
-  const dailyStore = { read() { try { return JSON.parse(localStorage.getItem(DAILY_KEY) || '{}'); } catch { return {}; } }, write(d) { try { localStorage.setItem(DAILY_KEY, JSON.stringify(d)); } catch { /* 禁用时不保存 */ } } };
+  const dailyStore = {
+    key() { return storage.dailyKey(saveKey); },
+    read() {
+      try {
+        const key = this.key();
+        let raw = localStorage.getItem(key);
+        if (raw === null) {
+          raw = localStorage.getItem(DAILY_KEY);
+          if (raw !== null) {
+            let legacy = {};
+            try { legacy = JSON.parse(raw) || {}; } catch (e) { legacy = {}; }
+            const accept = saveKey === storage.guestKey || window.confirm('发现此设备旧版的每日挑战进度。是否迁入当前存档？');
+            if (accept) { localStorage.setItem(key, raw); localStorage.removeItem(DAILY_KEY); }
+            else return {};
+          }
+        }
+        return JSON.parse(raw || '{}');
+      } catch { return {}; }
+    },
+    write(d) { try { localStorage.setItem(this.key(), JSON.stringify(d)); } catch { /* 禁用时不保存 */ } }
+  };
   let dailyMode = false, dailyData = null, dailyDone = false, dailySavedDate = '';
   let quickMode = false;
   // 服务端尝试（幂等结算）：首次操作时调用 game/start 拿 attempt_key
@@ -93,6 +124,39 @@
 
   function persist() {
     store.write({ unlocked, completed: [...completed], level, boards: saved.boards || {}, challenge, best });
+  }
+  function activateUserStorage(user, offerGuestImport) {
+    const uid = user && (user.id || user.uid);
+    if (!uid) return false;
+    const nextKey = storage.userKey(uid);
+    if (saveKey === nextKey) return false;
+    const active = storage.activate(uid, offerGuestImport, () =>
+      window.confirm('发现本设备的游客进度。是否导入到账号？游客进度仍会保留。')
+    );
+    saveKey = active.key;
+    saved = active.data;
+    unlocked = clamp(saved.unlocked || 1, 1, N);
+    completed = new Set(Array.isArray(saved.completed) ? saved.completed.filter(x => x >= 1 && x <= N) : []);
+    level = clamp(saved.level || 1, 1, unlocked);
+    best = (saved.best && typeof saved.best === 'object') ? saved.best : {};
+    challenge = !!saved.challenge;
+    saved.boards = saved.boards || {};
+    render();
+    loadLevel(level);
+    return true;
+  }
+  function activateGuestStorage() {
+    if (saveKey === 'quiet-sudoku') return;
+    saveKey = storage.guestKey;
+    saved = store.read();
+    unlocked = clamp(saved.unlocked || 1, 1, N);
+    completed = new Set(Array.isArray(saved.completed) ? saved.completed.filter(x => x >= 1 && x <= N) : []);
+    level = clamp(saved.level || 1, 1, unlocked);
+    best = (saved.best && typeof saved.best === 'object') ? saved.best : {};
+    challenge = !!saved.challenge;
+    saved.boards = saved.boards || {};
+    render();
+    loadLevel(level);
   }
   function saveGame() {
     if (quickMode) return;
@@ -986,7 +1050,7 @@
   }
 
   // ===== 音效（阶段⑥）：Web Audio 合成，无需音频文件 =====
-  let soundOn = store.read('soundOn') !== false; // 默认开
+  let soundOn = store.read('soundOn').soundOn !== false; // 默认开
   let audioCtx = null;
   function ensureAudio() {
     if (!audioCtx) {
@@ -1031,7 +1095,7 @@
   }
   function toggleSound() {
     soundOn = !soundOn;
-    store.write('soundOn', soundOn);
+    store.write(soundOn, 'soundOn');
     updateSoundBtn();
     if (soundOn) sfx('place');
     say(soundOn ? '🔊 音效已开启' : '🔇 音效已关闭');
@@ -1378,6 +1442,7 @@
     try {
       await apiCall('me/delete', 'POST', { password: pw });
       tokenSet(''); currentUser = null;
+      activateGuestStorage();
       updateUserUI(); setLeaderScope('all');
       $('delete-overlay').classList.remove('show');
       $('profile-overlay').classList.remove('show');
@@ -1430,6 +1495,7 @@
     };
     $('profile-logout').onclick = () => {
       tokenSet(''); currentUser = null;
+      activateGuestStorage();
       updateUserUI(); setLeaderScope('all'); closeProfile();
       say('已退出登录，进度将仅保存在本地');
     };
@@ -1528,6 +1594,7 @@
     try {
       const d = await apiCall('auth/me', 'GET');
       currentUser = d.user;
+      activateUserStorage(currentUser, false);
       currentUser.expNext = d.expNext || 100;
       currentUser.levelExp = d.levelExp || 0;
         updateUserUI();
@@ -1539,6 +1606,7 @@
     } catch (err) {
       if (err.status === 401) tokenSet('');
       currentUser = null;
+      activateGuestStorage();
       updateUserUI();
       setLeaderScope('all');
     }
@@ -1563,6 +1631,7 @@
       try {
         const d = await apiCall('auth/login', 'POST', { username, password });
         tokenSet(d.token); currentUser = d.user;
+        activateUserStorage(currentUser, true);
         currentUser.expNext = d.expNext || 100;
         currentUser.levelExp = d.levelExp || 0;
         updateUserUI(); closeAuth();
@@ -1592,6 +1661,7 @@
       try {
         const d = await apiCall('auth/register', 'POST', { username, password, nickname });
         tokenSet(d.token); currentUser = d.user;
+        activateUserStorage(currentUser, true);
         currentUser.expNext = d.expNext || 100;
         currentUser.levelExp = d.levelExp || 0;
         updateUserUI(); closeAuth();

@@ -125,8 +125,10 @@ function daily_puzzle($dateStr) {
 
 /** 每日题目缓存目录（运行时生成，不在 git） */
 function daily_cache_dir() {
-    $dir = __DIR__ . '/../cache/daily';
-    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    $dir = defined('PRIVATE_DATA_DIR') ? rtrim(PRIVATE_DATA_DIR, '/\\') . '/daily' : '';
+    if ($dir === '') $dir = rtrim(sys_get_temp_dir(), '/\\') . '/sudoku-daily-' . substr(sha1(__DIR__), 0, 12);
+    if (!is_dir($dir)) @mkdir($dir, 0700, true);
+    @chmod($dir, 0700);
     return $dir;
 }
 
@@ -138,7 +140,7 @@ function daily_puzzle_cached($dateStr) {
         if (is_array($j) && isset($j['cells'], $j['answer'])) return $j;
     }
     $p = daily_puzzle($dateStr);
-    @file_put_contents($file, json_encode($p));
+    if (@file_put_contents($file, json_encode($p)) !== false) @chmod($file, 0600);
     return $p;
 }
 

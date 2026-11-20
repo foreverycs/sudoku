@@ -2,7 +2,7 @@
  * 缓存应用外壳：首屏资源离线可用；API 不缓存（动态数据），断网时游戏核心本地可玩。
  * 版本统一：CACHE 名含版本（发版时 bump 一次），资源 ?v= 从 index.html 动态解析，避免与页面引用不同步。
  */
-const CACHE = 'sudoku-shell-v15';
+const CACHE = 'sudoku-shell-v18';
 
 // 从 index.html 解析当前资源版本号（与页面引用保持一致，免去多处硬编码）
 function buildAssets() {
@@ -13,6 +13,7 @@ function buildAssets() {
       return [
         '/', '/index.html', '/manifest.json',
         '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png',
+        '/sudoku-storage.js?v=' + q(/sudoku-storage\.js\?v=([\d]+)/),
         '/sudoku.css?v=' + q(/sudoku\.css\?v=([\d]+)/),
         '/sudoku.js?v=' + q(/sudoku\.js\?v=([\d]+)/),
         '/sudoku-data.js?v=' + q(/sudoku-data\.js\?v=([\d]+)/)

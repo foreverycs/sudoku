@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS game_records (
   is_record  TINYINT(1) NOT NULL DEFAULT 0,
   played_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_user (user_id, level),
+  INDEX idx_records_level_user_seconds (level, user_id, seconds),
   CONSTRAINT fk_records_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
