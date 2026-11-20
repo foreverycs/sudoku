@@ -7,6 +7,13 @@ require_once __DIR__ . '/../compat.php';
 require_once __DIR__ . '/auth.php';   // exp_needed / level_exp_into / daily_streak / user_pub
 require_once __DIR__ . '/game.php';   // user_stats
 
+function profile_daily_signature($uid, $rows) {
+    $canonical = array();
+    foreach ($rows as $row) $canonical[] = array((string)$row['date'], (int)$row['seconds']);
+    usort($canonical, function ($a, $b) { return strcmp($a[0], $b[0]); });
+    return hash_hmac('sha256', (int)$uid . ':' . json_encode($canonical), JWT_SECRET);
+}
+
 /** PUT me/avatar：设置头像（emoji 或图片 URL，短文本，无 <> 防 XSS） */
 function me_avatar_put() {
     $c = current_user();
@@ -110,11 +117,95 @@ function me_export() {
         'progress'     => $progress,
         'records'      => $records,
         'daily'        => $daily,
+        'dailySignature' => profile_daily_signature($uid, $daily),
         'achievements' => $achievements,
         'history'      => $history,
         'attempts'     => $attempts,
         'historyCount' => $historyCount,
     ));
+}
+
+/** POST me/import: restore only user-editable progress and daily completion history. */
+function me_import() {
+    $c = current_user();
+    $b = body();
+    if (!isset($b['version']) || (int)$b['version'] < 1 || (int)$b['version'] > 2) fail('备份版本不支持');
+    if (!isset($b['progress']) || !is_array($b['progress']) || count($b['progress']) > 100) fail('关卡进度格式无效');
+    $progress = array();
+    foreach ($b['progress'] as $row) {
+        if (!is_array($row)) fail('关卡进度格式无效');
+        $level = isset($row['level']) ? (int)$row['level'] : 0;
+        $cells = isset($row['cells']) ? (string)$row['cells'] : '';
+        $seconds = isset($row['seconds']) ? (int)$row['seconds'] : -1;
+        $notes = isset($row['notes']) ? $row['notes'] : array();
+        if (is_string($notes)) $notes = json_decode($notes, true);
+        if ($level < 1 || $level > 100 || isset($progress[$level])) fail('关卡编号无效或重复');
+        if (strlen($cells) !== 81 || !preg_match('/^[0-9]{81}$/', $cells)) fail('棋盘数据格式无效');
+        if ($seconds < 0 || $seconds > 100000 || !is_array($notes)) fail('用时或笔记格式无效');
+        $noteCount = 0;
+        foreach ($notes as $k => $values) {
+            if (!preg_match('/^(?:[0-7][0-9]|80)$/', (string)$k) || !is_array($values)) fail('笔记格式无效');
+            foreach ($values as $n) if (!is_numeric($n) || (int)$n < 1 || (int)$n > 9) fail('笔记值无效');
+            $noteCount += count($values);
+        }
+        if ($noteCount > 500) fail('笔记过多');
+        $progress[$level] = array($cells, json_encode($notes), $seconds);
+    }
+
+    $daily = isset($b['daily']) && is_array($b['daily']) ? $b['daily'] : array();
+    if (count($daily) > 3650) fail('每日记录过多');
+    foreach ($daily as $row) {
+        if (!is_array($row) || !isset($row['date'], $row['seconds'])) fail('每日记录格式无效');
+        $date = (string)$row['date'];
+        $seconds = (int)$row['seconds'];
+        $dt = DateTime::createFromFormat('Y-m-d', $date);
+        if (!$dt || $dt->format('Y-m-d') !== $date || $seconds < 0 || $seconds > 100000) fail('每日记录格式无效');
+    }
+    $dailyTrusted = isset($b['dailySignature']) && is_string($b['dailySignature'])
+        && profile_daily_signature((int)$c['uid'], $daily) === $b['dailySignature'];
+    if (!$dailyTrusted) $daily = array();
+
+    $pdo = db();
+    $uid = (int)$c['uid'];
+    try {
+        $pdo->beginTransaction();
+        $save = $pdo->prepare('INSERT INTO game_progress (user_id, level, cells, notes, seconds, revision) VALUES (?,?,?,?,?,1) ON DUPLICATE KEY UPDATE cells=VALUES(cells), notes=VALUES(notes), seconds=VALUES(seconds), revision=COALESCE(revision,1)+1');
+        foreach ($progress as $level => $row) {
+            $st = $pdo->prepare('SELECT cells, notes, seconds, COALESCE(revision,1) AS revision FROM game_progress WHERE user_id = ? AND level = ? FOR UPDATE');
+            $st->execute(array($uid, $level));
+            $old = $st->fetch();
+            if ($old && ((string)$old['cells'] !== $row[0] || (string)$old['notes'] !== $row[1] || (int)$old['seconds'] !== $row[2])) {
+                $pdo->prepare('INSERT INTO game_progress_history (user_id, level, cells, notes, seconds, revision) VALUES (?,?,?,?,?,?)')
+                    ->execute(array($uid, $level, $old['cells'], $old['notes'], (int)$old['seconds'], (int)$old['revision']));
+            }
+            $save->execute(array($uid, $level, $row[0], $row[1], $row[2]));
+        }
+        $dailySave = $pdo->prepare('INSERT IGNORE INTO daily_records (user_id, date, seconds) VALUES (?,?,?)');
+        foreach ($daily as $row) $dailySave->execute(array($uid, $row['date'], (int)$row['seconds']));
+        $pdo->commit();
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        fail('恢复失败：' . $e->getMessage(), 500);
+    }
+    ok(array('restoredLevels' => count($progress), 'restoredDaily' => $dailyTrusted ? count($daily) : 0, 'skippedUntrustedDaily' => !$dailyTrusted, 'preservedAwards' => true));
+}
+
+/** POST me/storage/clear: remove editable cloud boards and daily completion history only. */
+function me_storage_clear() {
+    $c = current_user();
+    $pdo = db();
+    $uid = (int)$c['uid'];
+    try {
+        $pdo->beginTransaction();
+        $pdo->prepare('DELETE FROM game_progress WHERE user_id = ?')->execute(array($uid));
+        $daily = $pdo->prepare('DELETE FROM daily_records WHERE user_id = ?');
+        $daily->execute(array($uid));
+        $pdo->commit();
+        ok(array('clearedBoards' => true, 'clearedDailyRecords' => $daily->rowCount(), 'keptHistory' => true));
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        fail('清理失败：' . $e->getMessage(), 500);
+    }
 }
 
 /** GET profile：个人主页聚合数据（用户/统计/各关最佳/最近成绩/每日/勋章） */

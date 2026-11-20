@@ -96,6 +96,7 @@
   const tokenSet = t => { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* 隐私模式忽略 */ } };
   let currentUser = null;
   let leaderScope = 'all';
+  let leaderPeriod = 'all';
   const cellsToStr = a => a.map(x => x | 0).join('');
   const notesToObj = n => { const o = {}; for (let i = 0; i < n.length; i++) { const s = n[i]; const arr = (s instanceof Set) ? [...s] : (Array.isArray(s) ? s : []); if (arr.length) o[i] = arr; } return o; };
   const strToCells = s => String(s || '').split('').map(x => { x = +x; return (x >= 0 && x <= 9) ? x : 0; });
@@ -641,7 +642,8 @@
     const cur = lv || level || 1;
     const intro = $('leader-intro');
     const friendsScope = leaderScope === 'friends';
-    if (intro) intro.textContent = '第 ' + cur + ' 关 · 用时越短越靠前' + (friendsScope ? ' · 好友' : '');
+    const periodLabel = leaderPeriod === 'week' ? '本周' : leaderPeriod === 'month' ? '本月' : '总榜';
+    if (intro) intro.textContent = '第 ' + cur + ' 关 · ' + periodLabel + '最佳用时' + (friendsScope ? ' · 好友' : '');
     const uid = currentUser ? currentUser.id : -1;
     const rowHtml = (u, i, extraTag) => {
       const me = u.id === uid;
@@ -654,7 +656,7 @@
         + '</div>';
     };
     try {
-      const route = friendsScope ? 'leaderboard/friends&level=' + cur + '&limit=15' : 'leaderboard&level=' + cur + '&limit=15';
+      const route = (friendsScope ? 'leaderboard/friends' : 'leaderboard') + '&level=' + cur + '&limit=15&period=' + leaderPeriod;
       const d = await apiCall(route, 'GET');
       const list = d.ranking || [];
       if (!list.length) {
@@ -681,20 +683,37 @@
     loadLeaderboard();
   }
 
+  function bindLeaderPeriod() {
+    const root = $('leader-period');
+    root.addEventListener('click', e => {
+      const btn = e.target.closest ? e.target.closest('[data-period]') : null;
+      if (!btn) return;
+      leaderPeriod = btn.getAttribute('data-period');
+      root.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+      loadLeaderboard();
+    });
+  }
+
   async function loadFriendList() {
     const root = $('friend-list');
     if (!currentUser) { root.innerHTML = '<div class="friend-empty">请先登录</div>'; return; }
     root.innerHTML = '<div class="friend-empty">加载中…</div>';
     try {
       const d = await apiCall('friends', 'GET');
-      const list = d.friends || [];
-      if (!list.length) { root.innerHTML = '<div class="friend-empty">还没有好友，输入用户名添加</div>'; return; }
-      root.innerHTML = list.map(f => '<div class="friend-item">'
+      const renderPeople = (target, people, empty, action, label) => {
+        if (!target) return;
+        if (!people.length) { target.innerHTML = '<div class="friend-empty">' + empty + '</div>'; return; }
+        target.innerHTML = people.map(f => '<div class="friend-item">'
         + '<span class="lb-ava">' + avatarHtml(f) + '</span>'
         + '<span class="fi-info"><span class="fi-name">' + esc(f.nickname || f.username) + '</span>'
-        + '<span class="fi-meta">@' + esc(f.username) + ' · Lv.' + (f.level || 1) + '</span></span>'
-        + '<button type="button" class="modal-btn ghost" data-fid="' + f.id + '">移除</button>'
+        + '<span class="fi-meta">@' + esc(f.username) + (f.level ? ' · Lv.' + f.level : '') + '</span></span>'
+        + '<button type="button" class="modal-btn ' + (action === 'remove' ? 'ghost' : 'primary') + '" data-fid="' + f.id + '" data-action="' + action + '">' + label + '</button>'
+        + (action === 'accept' ? '<button type="button" class="modal-btn ghost" data-fid="' + f.id + '" data-action="reject">拒绝</button>' : '')
         + '</div>').join('');
+      };
+      renderPeople(root, d.friends || [], '还没有好友，发送或接受申请', 'remove', '移除');
+      renderPeople($('friend-incoming'), d.incoming || [], '没有待处理申请', 'accept', '接受');
+      renderPeople($('friend-outgoing'), d.outgoing || [], '没有已发送申请', 'cancel', '撤回');
     } catch (e) { root.innerHTML = '<div class="friend-empty">加载失败：' + esc(e.message) + '</div>'; }
   }
 
@@ -712,18 +731,18 @@
       await apiCall('friends/add', 'POST', { username: name });
       input.value = '';
       loadFriendList();
-      if (leaderScope === 'friends') loadLeaderboard();
-      say('已添加好友');
+      say('好友申请已发送');
     } catch (e) { say('添加失败：' + e.message); }
   }
 
-  async function removeFriend(fid) {
+  async function friendAction(action, fid) {
     try {
-      await apiCall('friends/remove', 'POST', { id: fid });
+      const route = action === 'remove' ? 'friends/remove' : action === 'accept' ? 'friends/accept' : 'friends/reject';
+      await apiCall(route, 'POST', { id: fid });
       loadFriendList();
       if (leaderScope === 'friends') loadLeaderboard();
-      say('已移除好友');
-    } catch (e) { say('移除失败：' + e.message); }
+      say(action === 'accept' ? '已成为好友' : action === 'remove' ? '已移除好友' : '申请已处理');
+    } catch (e) { say('操作失败：' + e.message); }
   }
 
   // ===== 每日挑战（阶段七） =====
@@ -1423,6 +1442,88 @@
     } catch (e) { say('导出失败：' + e.message); }
   }
 
+  let pendingBackup = null;
+  async function refreshBackupStatus() {
+    const status = $('backup-status');
+    status.textContent = '正在读取本地与云端存档…';
+    try {
+      const cloud = await apiCall('progress', 'GET');
+      const count = Object.keys(cloud.progress || {}).length;
+      const localCount = Object.keys((saved && saved.boards) || {}).length;
+      status.textContent = '当前账号「' + (currentUser.nickname || currentUser.username) + '」：本地 ' + localCount + ' 关，云端 ' + count + ' 关。每日完成记录独立同步。';
+    } catch (e) { status.textContent = '无法读取云端存档：' + e.message; }
+  }
+
+  function backupPayload(data) {
+    return {
+      backupVersion: 1,
+      exportedAt: data.exportedAt || new Date().toISOString(),
+      source: { username: data.user && data.user.username ? data.user.username : '' },
+      progress: Array.isArray(data.progress) ? data.progress : [],
+      daily: Array.isArray(data.daily) ? data.daily : [],
+      dailySignature: data.dailySignature || ''
+    };
+  }
+
+  async function exportRestorableBackup() {
+    try {
+      const data = await apiCall('me/export', 'GET');
+      const payload = backupPayload(data);
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob), a = document.createElement('a');
+      a.href = url;
+      a.download = 'sudoku-backup-' + ((currentUser && currentUser.username) || 'me') + '-' + Date.now() + '.json';
+      a.click(); URL.revokeObjectURL(url);
+      say('可恢复备份已导出');
+    } catch (e) { say('导出失败：' + e.message); }
+  }
+
+  async function inspectBackupFile(file) {
+    pendingBackup = null;
+    $('backup-import').disabled = true;
+    if (!file) { $('backup-preview').textContent = ''; return; }
+    if (file.size > 5 * 1024 * 1024) { $('backup-preview').textContent = '文件超过 5 MB 限制'; return; }
+    try {
+      const parsed = JSON.parse(await file.text());
+      const version = +parsed.backupVersion || +parsed.version || 0;
+      if (version < 1 || version > 2 || !Array.isArray(parsed.progress) || parsed.progress.length > 100) throw new Error('备份版本或进度列表无效');
+      const daily = Array.isArray(parsed.daily) ? parsed.daily : [];
+      if (daily.length > 3650) throw new Error('每日记录数量超过限制');
+      pendingBackup = { version, progress: parsed.progress, daily, dailySignature: parsed.dailySignature || '' };
+      const trustedDaily = !!pendingBackup.dailySignature;
+      $('backup-preview').textContent = '备份版本 v' + version + ' · ' + parsed.progress.length + ' 关进度 · ' + daily.length + ' 条每日记录。' + (trustedDaily ? '每日记录带服务器签名。' : '此备份无每日记录签名，将只恢复棋盘，不导入每日记录。') + '不会覆盖经验、勋章、历史成绩与账号信息。覆盖云端棋盘前会自动留历史快照。';
+      $('backup-import').disabled = false;
+    } catch (e) { $('backup-preview').textContent = '无法读取此备份：' + e.message; }
+  }
+
+  async function importBackupFile() {
+    if (!pendingBackup) return;
+    const info = pendingBackup;
+    if (!window.confirm('将恢复 ' + info.progress.length + ' 关进度和 ' + info.daily.length + ' 条每日记录到当前账号。此操作不可自动撤销，继续吗？')) return;
+    try {
+      const result = await apiCall('me/import', 'POST', { version: info.version, progress: info.progress, daily: info.daily, dailySignature: info.dailySignature });
+      pendingBackup = null; $('backup-file').value = ''; $('backup-preview').textContent = '';
+      await syncProgress(); await refreshBackupStatus(); loadLevel(level);
+      say('备份恢复完成：' + result.restoredLevels + ' 关进度' + (result.skippedUntrustedDaily ? '；未恢复无签名每日记录' : ''));
+    } catch (e) { say('恢复失败：' + e.message); }
+  }
+
+  async function clearCloudEditableData() {
+    if (!window.confirm('将删除账号的云端棋盘进度和每日挑战记录；成绩、经验、勋章及进度历史保留。此操作不可撤销，继续吗？')) return;
+    try {
+      await apiCall('me/storage/clear', 'POST', {});
+      saved.boards = {}; persist(); await refreshBackupStatus(); loadLevel(level);
+      say('云端棋盘与每日记录已清空');
+    } catch (e) { say('清理失败：' + e.message); }
+  }
+
+  function openBackupManager() {
+    if (!currentUser) { say('请先登录'); return; }
+    $('backup-overlay').classList.add('show');
+    pendingBackup = null; $('backup-file').value = ''; $('backup-preview').textContent = '';
+    $('backup-import').disabled = true; refreshBackupStatus();
+  }
+
   async function changePassword() {
     const old = $('pw-old').value, n1 = $('pw-new').value, n2 = $('pw-new2').value;
     if (n1.length < 6 || n1.length > 64) { say('新密码长度需 6-64 位'); return; }
@@ -1461,8 +1562,10 @@
     $('friend-username').addEventListener('keydown', e => { if (e.key === 'Enter') addFriend(); });
     $('friend-list').onclick = e => {
       const btn = e.target.closest ? e.target.closest('[data-fid]') : null;
-      if (btn) removeFriend(+btn.getAttribute('data-fid'));
+      if (btn) friendAction(btn.getAttribute('data-action') || 'remove', +btn.getAttribute('data-fid'));
     };
+    $('friend-incoming').onclick = e => { const btn = e.target.closest ? e.target.closest('[data-fid]') : null; if (btn) friendAction(btn.getAttribute('data-action'), +btn.getAttribute('data-fid')); };
+    $('friend-outgoing').onclick = e => { const btn = e.target.closest ? e.target.closest('[data-fid]') : null; if (btn) friendAction(btn.getAttribute('data-action'), +btn.getAttribute('data-fid')); };
     $('friends-overlay').addEventListener('click', e => { if (e.target === $('friends-overlay')) $('friends-overlay').classList.remove('show'); });
   }
 
@@ -1501,6 +1604,13 @@
     };
     $('me-password').onclick = () => { $('pw-old').value = ''; $('pw-new').value = ''; $('pw-new2').value = ''; $('password-overlay').classList.add('show'); };
     $('me-export').onclick = exportMyData;
+    $('me-backups').onclick = openBackupManager;
+    $('backup-close').onclick = () => $('backup-overlay').classList.remove('show');
+    $('backup-overlay').addEventListener('click', e => { if (e.target === $('backup-overlay')) $('backup-overlay').classList.remove('show'); });
+    $('backup-file').onchange = e => inspectBackupFile(e.target.files && e.target.files[0]);
+    $('backup-export').onclick = exportRestorableBackup;
+    $('backup-import').onclick = importBackupFile;
+    $('backup-clear').onclick = clearCloudEditableData;
     $('me-delete').onclick = () => { $('del-password').value = ''; $('delete-overlay').classList.add('show'); };
     $('password-close').onclick = () => $('password-overlay').classList.remove('show');
     $('delete-close').onclick = () => $('delete-overlay').classList.remove('show');
@@ -1689,6 +1799,7 @@
   bindShare();
   bindProfile();
   bindFriends();
+  bindLeaderPeriod();
   initAuth();
   loadLeaderboard();
   loadLevel(level);

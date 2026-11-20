@@ -303,10 +303,15 @@ function leader_has_best($r) {
 function leaderboard() {
     $limit = isset($_GET['limit']) ? min(50, max(5, (int)$_GET['limit'])) : 10;
     $level = isset($_GET['level']) ? (int)$_GET['level'] : 1;
+    $period = isset($_GET['period']) ? (string)$_GET['period'] : 'all';
+    if (!in_array($period, array('all', 'week', 'month'), true)) $period = 'all';
     if ($level < 1) $level = 1;
     if ($level > 100) $level = 100;
     $pdo = db();
-    $bestSql = 'SELECT user_id, MIN(seconds) AS best FROM game_records WHERE level = ? GROUP BY user_id';
+    $periodSql = '';
+    if ($period === 'week') $periodSql = ' AND played_at >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)';
+    elseif ($period === 'month') $periodSql = ' AND played_at >= DATE_FORMAT(CURDATE(), "%Y-%m-01")';
+    $bestSql = 'SELECT user_id, MIN(seconds) AS best FROM game_records WHERE level = ?' . $periodSql . ' GROUP BY user_id';
     $st = $pdo->prepare(
         'SELECT u.id, u.username, u.nickname, u.avatar, b.best'
         . ' FROM (' . $bestSql . ') b JOIN users u ON u.id = b.user_id'
@@ -353,5 +358,5 @@ function leaderboard() {
             }
         }
     }
-    ok(array('ranking' => $rows, 'count' => count($rows), 'my' => $my, 'level' => $level));
+    ok(array('ranking' => $rows, 'count' => count($rows), 'my' => $my, 'level' => $level, 'period' => $period));
 }

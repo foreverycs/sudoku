@@ -52,11 +52,30 @@ function ensure_security_schema() {
         id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         user_a     INT UNSIGNED NOT NULL,
         user_b     INT UNSIGNED NOT NULL,
+        status     TINYINT UNSIGNED NOT NULL DEFAULT 1,
+        requested_by INT UNSIGNED NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         UNIQUE KEY uq_pair (user_a, user_b),
         CONSTRAINT fk_friend_a FOREIGN KEY (user_a) REFERENCES users(id) ON DELETE CASCADE,
         CONSTRAINT fk_friend_b FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+
+    try {
+        $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "friends" AND COLUMN_NAME = "status"');
+        $st->execute();
+        if ((int)$st->fetchColumn() === 0) $pdo->exec('ALTER TABLE friends ADD COLUMN status TINYINT UNSIGNED NOT NULL DEFAULT 1, ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+    } catch (Exception $e) {
+        // Existing friendship rows stay accepted during migration.
+    }
+    try {
+        $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "friends" AND COLUMN_NAME = "requested_by"');
+        $st->execute();
+        if ((int)$st->fetchColumn() === 0) $pdo->exec('ALTER TABLE friends ADD COLUMN requested_by INT UNSIGNED NULL');
+        $pdo->exec('UPDATE friends SET requested_by = user_a WHERE status = 0 AND requested_by IS NULL');
+    } catch (Exception $e) {
+        // Pending legacy rows default to user_a as their initiator.
+    }
 
     // Optional index for per-level best-time aggregation in leaderboards.
     try {

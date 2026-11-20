@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <script src="sudoku-storage.js?v=2"></script>
 <title>数独 · 静心一刻</title>
-  <link rel="stylesheet" href="sudoku.css?v=31">
+  <link rel="stylesheet" href="sudoku.css?v=33">
 </head>
 <body>
 <div class="shell">
@@ -26,6 +26,11 @@
   <div class="leader-scope" id="leader-scope">
     <button class="active" data-scope="all" type="button">全站</button>
     <button data-scope="friends" type="button">好友</button>
+  </div>
+  <div class="leader-period" id="leader-period">
+    <button class="active" data-period="all" type="button">总榜</button>
+    <button data-period="week" type="button">本周</button>
+    <button data-period="month" type="button">本月</button>
   </div>
   <p class="leader-intro" id="leader-intro">第 1 关 · 用时越短越靠前</p>
   <div class="leader-list" id="leader-list"><div class="leader-loading">加载中…</div></div>
@@ -166,9 +171,23 @@
     <div class="pf-account">
       <button class="modal-btn ghost" id="me-password" type="button">修改密码</button>
       <button class="modal-btn ghost" id="me-export" type="button">导出数据</button>
+      <button class="modal-btn ghost" id="me-backups" type="button">存档管理</button>
       <button class="modal-btn ghost" id="me-delete" type="button">删除账号</button>
     </div>
     <button class="modal-btn ghost pf-logout" id="profile-logout">退出登录</button>
+  </div>
+</div>
+<!-- 存档管理 -->
+<div class="overlay" id="backup-overlay">
+  <div class="modal auth-modal backup-modal">
+    <button class="auth-close" id="backup-close" aria-label="关闭">✕</button>
+    <h3>存档管理</h3>
+    <p class="backup-status" id="backup-status">正在检查本地与云端存档…</p>
+    <button class="modal-btn ghost backup-action" id="backup-export" type="button">导出可恢复备份</button>
+    <label class="backup-file">选择 JSON 备份<input id="backup-file" type="file" accept="application/json,.json"></label>
+    <div class="backup-preview" id="backup-preview"></div>
+    <button class="modal-btn primary backup-action" id="backup-import" type="button" disabled>确认恢复</button>
+    <button class="modal-btn ghost backup-action backup-clear" id="backup-clear" type="button">清空云端棋盘与每日记录</button>
   </div>
 </div>
 <!-- 修改密码 -->
@@ -201,7 +220,9 @@
       <input id="friend-username" class="auth-input" placeholder="输入用户名添加好友" autocomplete="off">
       <button class="modal-btn primary" id="friend-add-btn" type="button">添加</button>
     </div>
-    <div class="friend-list" id="friend-list"></div>
+    <h4 class="friend-sec">好友</h4><div class="friend-list" id="friend-list"></div>
+    <h4 class="friend-sec">收到的申请</h4><div class="friend-list" id="friend-incoming"></div>
+    <h4 class="friend-sec">已发送申请</h4><div class="friend-list" id="friend-outgoing"></div>
   </div>
 </div>
 <!-- 头像选择 -->
@@ -237,6 +258,6 @@
 </div>
 <div class="toasts" id="toasts"></div>
 <script src="sudoku-data.js?v=17"></script>
-<script src="sudoku.js?v=38"></script>
+<script src="sudoku.js?v=41"></script>
 </body>
 </html>

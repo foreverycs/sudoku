@@ -97,6 +97,16 @@ try {
         if (!rate_limit_check('me_export', 'uid:' . (int)$rateUser['uid'], 10, 3600)) fail('导出过于频繁', 429);
         return me_export();
     }
+    if ($method === 'POST' && $r === 'me/import') {
+        $rateUser = current_user();
+        if (!rate_limit_check('me_import', 'uid:' . (int)$rateUser['uid'], 3, 3600)) fail('恢复操作过于频繁', 429);
+        return me_import();
+    }
+    if ($method === 'POST' && $r === 'me/storage/clear') {
+        $rateUser = current_user();
+        if (!rate_limit_check('me_storage_clear', 'uid:' . (int)$rateUser['uid'], 3, 3600)) fail('清理操作过于频繁', 429);
+        return me_storage_clear();
+    }
     if ($method === 'GET'  && $r === 'leaderboard')   return leaderboard();
     if ($method === 'GET'  && $r === 'leaderboard/friends') {
         $rateUser = current_user();
@@ -112,6 +122,16 @@ try {
         $rateUser = current_user();
         if (!rate_limit_check('friends_add', 'uid:' . (int)$rateUser['uid'], 30, 3600)) fail('操作过于频繁', 429);
         return friends_add();
+    }
+    if ($method === 'POST' && $r === 'friends/accept') {
+        $rateUser = current_user();
+        if (!rate_limit_check('friends_accept', 'uid:' . (int)$rateUser['uid'], 60, 3600)) fail('操作过于频繁', 429);
+        return friends_accept();
+    }
+    if ($method === 'POST' && $r === 'friends/reject') {
+        $rateUser = current_user();
+        if (!rate_limit_check('friends_reject', 'uid:' . (int)$rateUser['uid'], 60, 3600)) fail('操作过于频繁', 429);
+        return friends_reject();
     }
     if ($method === 'POST' && $r === 'friends/remove') {
         $rateUser = current_user();
