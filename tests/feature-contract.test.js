@@ -11,6 +11,7 @@ const friends = read('api/handlers/friends.php');
 const game = read('api/handlers/game.php');
 const daily = read('api/handlers/daily.php');
 const maintenance = read('api/maintenance.php');
+const admin = read('api/handlers/admin.php');
 const router = read('api/index.php');
 const html = read('index.html');
 const js = read('sudoku.js');
@@ -89,4 +90,15 @@ test('attempt cleanup is CLI-only, dry-run by default, and retains unfinished at
   assert.match(maintenance, /in_array\('--apply'/);
   assert.match(maintenance, /completed_at IS NOT NULL AND completed_at < \?/);
   assert.match(maintenance, /dry-run/);
+});
+
+test('admin password reset protects admins, uses strong randomness, and invalidates old tokens', () => {
+  const reset = admin.slice(admin.indexOf('function admin_user_password_reset'), admin.indexOf('function admin_user_reset'));
+  assert.match(reset, /不能重置内置管理员/);
+  assert.match(reset, /role.*!== 'user'/);
+  assert.match(reset, /openssl_random_pseudo_bytes\(18, \$strong\)/);
+  assert.match(reset, /token_version = token_version \+ 1/);
+  assert.match(reset, /temporaryPassword/);
+  assert.match(router, /admin\/users\/\(\\d\+\)\/password/);
+  assert.match(read('admin/admin.js'), /resetUserPassword/);
 });

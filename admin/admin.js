@@ -173,9 +173,35 @@ function userActions(u) {
     ? '<button class="btn btn-ghost btn-sm" onclick="adminAction(' + u.id + ',\'role\',\'admin\')">设管理员</button>'
     : '';
   const reset = '<button class="btn btn-ghost btn-sm" onclick="if(confirm(\'确认重置该用户进度？\'))adminAction(' + u.id + ',\'reset\')">重置</button>';
+  const password = '<button class="btn btn-ghost btn-sm" onclick="resetUserPassword(' + u.id + ')">重置密码</button>';
   const del = '<button class="btn btn-danger btn-sm" onclick="deleteUser(' + u.id + ')">删除</button>';
-  return ban + role + reset + del;
+  return ban + role + reset + password + del;
 }
+async function resetUserPassword(id) {
+  if (!confirm('将立即重置用户 #' + id + ' 的密码，并使其现有登录失效。继续？')) return;
+  try {
+    const d = await api('admin/users/' + id + '/password', 'POST');
+    $('#password-reset-user').textContent = '用户 #' + d.id + ' 的临时密码';
+    $('#password-reset-value').value = d.temporaryPassword;
+    $('#password-reset-modal').style.display = 'grid';
+  } catch (e) { alert('密码重置失败：' + e.message); }
+}
+function closePasswordReset() {
+  $('#password-reset-modal').style.display = 'none';
+  $('#password-reset-value').value = '';
+  $('#password-reset-user').textContent = '';
+}
+$('#password-reset-close').addEventListener('click', closePasswordReset);
+$('#password-reset-copy').addEventListener('click', async () => {
+  const input = $('#password-reset-value');
+  try {
+    await navigator.clipboard.writeText(input.value);
+    $('#password-reset-copy').textContent = '已复制';
+  } catch (e) {
+    input.focus(); input.select(); document.execCommand('copy');
+    $('#password-reset-copy').textContent = '已复制';
+  }
+});
 async function adminAction(id, type, val) {
   try {
     if (type === 'status') await api('admin/users/' + id + '/status', 'POST', { status: val });

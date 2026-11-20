@@ -162,6 +162,19 @@ tr:hover td{background:var(--hover)}
       <button class="btn btn-ghost" id="confirm-cancel">取消</button>
       <button class="btn btn-danger" id="confirm-ok">确认删除</button>
     </div>
+ </div>
+</div>
+
+<!-- 一次性临时密码：关闭后不保存在浏览器 -->
+<div id="password-reset-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:110;place-items:center;padding:16px">
+  <div style="background:var(--card);border-radius:12px;padding:22px;width:100%;max-width:380px;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+    <h3 id="password-reset-user" style="font-size:16px;margin-bottom:8px">临时密码</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">请通过安全渠道交给用户。密码仅显示本次，关闭后不会保存。</p>
+    <input id="password-reset-value" readonly style="width:100%;padding:11px;border:1px solid var(--line);border-radius:8px;font:14px ui-monospace,monospace;margin-bottom:14px">
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn btn-ghost" id="password-reset-close" type="button">关闭</button>
+      <button class="btn btn-primary" id="password-reset-copy" type="button" style="width:auto">复制</button>
+    </div>
   </div>
 </div>
 

@@ -169,6 +169,26 @@ function admin_user_role($id) {
     ok(array('id' => (int)$id, 'role' => $role));
 }
 
+/** POST admin/users/{id}/password: issue a one-time temporary password for a regular user. */
+function admin_user_password_reset($id) {
+    require_admin();
+    if ((int)$id === 1) fail('不能重置内置管理员');
+    $pdo = db();
+    $st = $pdo->prepare('SELECT id, role FROM users WHERE id = ?');
+    $st->execute(array((int)$id));
+    $user = $st->fetch();
+    if (!$user) fail('用户不存在', 404);
+    if ($user['role'] !== 'user') fail('只能重置普通用户密码');
+
+    $strong = false;
+    $bytes = function_exists('openssl_random_pseudo_bytes') ? openssl_random_pseudo_bytes(18, $strong) : false;
+    if ($bytes === false || !$strong) fail('安全随机数生成失败，请稍后重试', 500);
+    $temporaryPassword = substr(rtrim(strtr(base64_encode($bytes), '+/', '-_'), '='), 0, 24);
+    $pdo->prepare('UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?')
+        ->execute(array(ph_hash($temporaryPassword), (int)$id));
+    ok(array('id' => (int)$id, 'temporaryPassword' => $temporaryPassword, 'mustChangeAtNextLogin' => false));
+}
+
 /** POST admin/users/{id}/reset：重置用户进度（清经验/等级/记录/进度/勋章） */
 function admin_user_reset($id) {
     require_admin();

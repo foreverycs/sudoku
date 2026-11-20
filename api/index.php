@@ -160,6 +160,11 @@ try {
     if ($method === 'GET'  && preg_match('#^admin/users/(\d+)$#', $r, $m)) return admin_user_detail((int)$m[1]);
     if ($method === 'POST' && preg_match('#^admin/users/(\d+)/status$#', $r, $m)) return admin_user_status((int)$m[1]);
     if ($method === 'POST' && preg_match('#^admin/users/(\d+)/role$#', $r, $m)) return admin_user_role((int)$m[1]);
+    if ($method === 'POST' && preg_match('#^admin/users/(\d+)/password$#', $r, $m)) {
+        $rateAdmin = require_admin();
+        if (!rate_limit_check('admin_password_reset', 'uid:' . (int)$rateAdmin['uid'], 20, 3600)) fail('密码重置操作过于频繁', 429);
+        return admin_user_password_reset((int)$m[1]);
+    }
     if ($method === 'POST' && preg_match('#^admin/users/(\d+)/reset$#', $r, $m)) return admin_user_reset((int)$m[1]);
     if ($method === 'POST' && preg_match('#^admin/users/(\d+)/delete$#', $r, $m)) return admin_user_delete((int)$m[1]);
     if ($method === 'GET'  && $r === 'admin/achievements')    return admin_achievements();
