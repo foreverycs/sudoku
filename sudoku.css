@@ -191,7 +191,9 @@ main{display:grid;grid-template-columns:230px minmax(330px,540px) 1fr;gap:40px;a
 .avatar img,.lb-ava img{width:100%;height:100%;object-fit:cover;border-radius:50%}
 .avatar .ava-emoji,.lb-ava .ava-emoji{font-size:1.15em;line-height:1}
 .avatar .ava-letter,.lb-ava .ava-letter{font-weight:650}
-.profile-modal{max-width:380px;text-align:left;max-height:86vh;overflow-y:auto}
+.profile-modal{max-width:380px;text-align:left;max-height:86vh;overflow:hidden;border-radius:16px;position:relative;padding:0}
+.profile-modal-scroll{max-height:86vh;overflow-y:auto;overscroll-behavior:contain;border-radius:inherit;padding:26px 26px 22px;scrollbar-gutter:stable}
+.profile-modal>.auth-close{z-index:3}
 .pf-head{display:flex;align-items:center;gap:14px}
 .pf-avatar{width:60px;height:60px;border-radius:50%;background:var(--pale);border:2px solid var(--line);display:grid;place-items:center;font-size:30px;overflow:hidden;cursor:pointer;flex:none;transition:.15s}
 .pf-avatar:hover{border-color:var(--green)}
