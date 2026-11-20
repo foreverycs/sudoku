@@ -219,6 +219,20 @@ function daily_history() {
     ));
 }
 
+/** GET daily/puzzle: return a completed historical puzzle without its solution. */
+function daily_puzzle_review() {
+    $c = current_user();
+    $date = isset($_GET['date']) ? (string)$_GET['date'] : '';
+    $dt = DateTime::createFromFormat('Y-m-d', $date);
+    if (!$dt || $dt->format('Y-m-d') !== $date || $date > date('Y-m-d')) fail('日期无效');
+    $st = db()->prepare('SELECT seconds FROM daily_records WHERE user_id = ? AND date = ?');
+    $st->execute(array((int)$c['uid'], $date));
+    $record = $st->fetch();
+    if (!$record) fail('只能回顾已完成的每日挑战', 404);
+    $puzzle = daily_puzzle_cached($date);
+    ok(array('date' => $date, 'cells' => $puzzle['cells'], 'seconds' => (int)$record['seconds'], 'readOnly' => true));
+}
+
 /** 验证每日挑战提交棋盘 == 权威解 */
 function validate_daily_solution($submittedCells, $answer) {
     if (strlen($submittedCells) !== 81 || strlen($answer) !== 81) return false;

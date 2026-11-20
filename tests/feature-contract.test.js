@@ -9,6 +9,8 @@ const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 const profile = read('api/handlers/profile.php');
 const friends = read('api/handlers/friends.php');
 const game = read('api/handlers/game.php');
+const daily = read('api/handlers/daily.php');
+const maintenance = read('api/maintenance.php');
 const router = read('api/index.php');
 const html = read('index.html');
 const js = read('sudoku.js');
@@ -68,4 +70,23 @@ test('backup manager requires preview and confirmation before restore or clearin
   assert.match(js, /window\.confirm\('将恢复/);
   assert.match(js, /window\.confirm\('将删除账号的云端棋盘进度/);
   assert.match(router, /me\/storage\/clear/);
+});
+
+test('daily history review is completed-only, read-only, and does not expose the answer', () => {
+  const review = daily.slice(daily.indexOf('function daily_puzzle_review()'), daily.indexOf('function validate_daily_solution'));
+  assert.match(review, /SELECT seconds FROM daily_records/);
+  assert.match(review, /puzzle\['cells'\]/);
+  assert.match(review, /readOnly/);
+  assert.doesNotMatch(review, /puzzle\['answer'\]/);
+  assert.match(js, /function enter\(d\) \{\s*if \(dailyReview\) \{ say\('历史回顾为只读模式'\); return; \}/);
+  assert.match(js, /function erase\(\) \{\s*if \(dailyReview\) \{ say\('历史回顾为只读模式'\); return; \}/);
+  assert.match(js, /daily-review-mode/);
+  assert.match(html, /daily-review-action/);
+});
+
+test('attempt cleanup is CLI-only, dry-run by default, and retains unfinished attempts', () => {
+  assert.match(maintenance, /PHP_SAPI !== 'cli'/);
+  assert.match(maintenance, /in_array\('--apply'/);
+  assert.match(maintenance, /completed_at IS NOT NULL AND completed_at < \?/);
+  assert.match(maintenance, /dry-run/);
 });

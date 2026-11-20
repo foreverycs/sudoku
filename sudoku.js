@@ -60,6 +60,7 @@
     write(d) { try { localStorage.setItem(this.key(), JSON.stringify(d)); } catch { /* 禁用时不保存 */ } }
   };
   let dailyMode = false, dailyData = null, dailyDone = false, dailySavedDate = '';
+  let dailyReview = false;
   let quickMode = false;
   // 服务端尝试（幂等结算）：首次操作时调用 game/start 拿 attempt_key
   let attemptKey = '';
@@ -170,7 +171,9 @@
   }
 
   function loadLevel(l) {
+    document.body.classList.remove('daily-review-mode');
     dailyMode = false; dailyData = null; dailyDone = false; dailySavedDate = '';
+    dailyReview = false;
     quickMode = false;
     attemptKey = ''; attemptStartP = null; // 新关卡重置服务端尝试
     dailyAttemptKey = ''; dailyAttemptStartP = null;
@@ -357,6 +360,7 @@
   }
 
   function enter(d) {
+    if (dailyReview) { say('历史回顾为只读模式'); return; }
     if (selected < 0 || given[selected]) return;
     if (!playStart) startTimer(); // 首次操作（填数/笔记）才开始计时
     if (currentUser) ensureAttemptStarted().catch(() => { /* 启动失败不阻塞本地操作，结算时再试 */ });
@@ -378,6 +382,7 @@
   }
 
   function erase() {
+    if (dailyReview) { say('历史回顾为只读模式'); return; }
     if (selected < 0 || given[selected]) return;
     history.push({ board: board.slice(), notes: notes.map(s => new Set(s)) });
     board[selected] = 0; notes[selected].clear();
@@ -773,6 +778,8 @@
       dailyData = await apiCall('daily', 'GET');
       dailyDone = !!dailyData.solved;
       updateDailyCard();
+      const notice = $('daily-reminder');
+      if (notice) notice.textContent = dailyDone ? '今日已完成 · 当前连胜 ' + (dailyData.streak || 0) + ' 天' : '今日尚未完成 · 当前连胜 ' + (dailyData.streak || 0) + ' 天';
     } catch (e) { /* 网络忽略，卡片保持默认 */ }
   }
 
@@ -782,6 +789,8 @@
     dailyAttemptKey = ''; dailyAttemptStartP = null;
     try {
       const d = await apiCall('daily', 'GET');
+      dailyReview = false;
+      document.body.classList.remove('daily-review-mode');
       dailyData = d;
       dailyMode = true;
       dailyDone = !!d.solved;
@@ -805,6 +814,32 @@
     } catch (e) {
       say('今日挑战加载失败：' + (e.message || '网络异常'));
     }
+  }
+
+  async function reviewDailyPuzzle(date) {
+    if (!currentUser) { say('登录后可回顾每日题目'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    try {
+      const d = await apiCall('daily/puzzle&date=' + encodeURIComponent(date), 'GET');
+      dailyData = { date: date, solved: true };
+      dailyMode = true; dailyReview = true; quickMode = false; dailyDone = true;
+      dailySavedDate = '';
+      board = (d.cells || '').split('').map(Number);
+      solution = (d.cells || '').split('').map(Number);
+      given = board.map(() => true);
+      notes = Array.from({ length: 81 }, () => new Set());
+      history = []; selected = -1; seconds = 0; playAcc = 0; playStart = 0;
+      clearInterval(timerId); timerId = null;
+      $('modal-title').textContent = '每日题目回顾';
+      $('modal-replay').style.display = 'none';
+      $('modal-next').textContent = '返回闯关 ›';
+      $('modal-share').style.display = 'none';
+      document.body.classList.add('daily-review-mode');
+      render(); updateTimer();
+      say(date + ' · 只读回顾，不计时、不计分');
+      const bd = document.querySelector('.board');
+      if (bd && bd.scrollIntoView) bd.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (e) { say('题目回顾失败：' + e.message); }
   }
 
   async function dailyWin() {
@@ -1353,7 +1388,11 @@
   function dailyCalTap(btn) {
     const day = btn.getAttribute('data-day'), sec = btn.getAttribute('data-sec');
     if (!day || !sec) return;
-    say(dailyCal.y + '年' + dailyCal.m + '月' + day + '日：用时 ' + fmtClock(+sec));
+    const date = dailyCal.y + '-' + String(dailyCal.m).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    $('daily-review-action').style.display = '';
+    $('daily-review-action').textContent = date + ' · ' + fmtClock(+sec) + ' · 回顾题目';
+    $('daily-review-action').onclick = () => reviewDailyPuzzle(date);
+    say(date + '：用时 ' + fmtClock(+sec) + ' · 可回顾题目');
   }
 
   async function loadProgressHistory() {
