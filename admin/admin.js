@@ -172,13 +172,13 @@ function userActions(u) {
   const role = u.role === 'user'
     ? '<button class="btn btn-ghost btn-sm" onclick="adminAction(' + u.id + ',\'role\',\'admin\')">设管理员</button>'
     : '';
-  const reset = '<button class="btn btn-ghost btn-sm" onclick="if(confirm(\'确认重置该用户进度？\'))adminAction(' + u.id + ',\'reset\')">重置</button>';
-  const password = '<button class="btn btn-ghost btn-sm" onclick="resetUserPassword(' + u.id + ')">重置密码</button>';
+  const password = '<button class="btn btn-ghost btn-sm" onclick="resetUserPassword(' + u.id + ')">重置密码…</button>';
+  const reset = '<button class="btn btn-ghost btn-sm" onclick="if(confirm(\'确认清空该用户的关卡进度、成绩、经验和勋章？此操作不修改密码。\'))adminAction(' + u.id + ',\'reset\')">清空进度</button>';
   const del = '<button class="btn btn-danger btn-sm" onclick="deleteUser(' + u.id + ')">删除</button>';
   return ban + role + reset + password + del;
 }
 async function resetUserPassword(id) {
-  if (!confirm('将立即重置用户 #' + id + ' 的密码，并使其现有登录失效。继续？')) return;
+  if (!confirm('仅重置用户 #' + id + ' 的密码，不会清空进度。系统将生成一次性临时密码并使其现有登录失效；继续后请立即复制并安全转交。')) return;
   try {
     const d = await api('admin/users/' + id + '/password', 'POST');
     $('#password-reset-user').textContent = '用户 #' + d.id + ' 的临时密码';
