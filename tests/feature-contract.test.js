@@ -119,3 +119,9 @@ test('normal puzzle answers stay server-side and API errors use redacted daily l
   assert.doesNotMatch(log, /php:\/\/input|Authorization|password/);
   assert.match(read('api/resp.php'), /api_log_error\(\$msg, \$code\)/);
 });
+
+test('quick games complete locally instead of using ranked server validation', () => {
+  const enter = js.slice(js.indexOf('function enter('), js.indexOf('function erase('));
+  assert.match(enter, /if \(quickMode\) win\(\)/);
+  assert.match(enter, /else if \(currentUser\) settleComplete\(seconds\)/);
+});

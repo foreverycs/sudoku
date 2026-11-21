@@ -376,7 +376,8 @@
         return;
       }
       if (board.every(x => x >= 1 && x <= 9)) {
-        if (currentUser) settleComplete(seconds);
+        if (quickMode) win();
+        else if (currentUser) settleComplete(seconds);
         else say('请登录后提交本关成绩');
         saveGame(); render(); return;
       }
