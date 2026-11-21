@@ -4,7 +4,7 @@
   --ink:#20251f; --muted:#81877f; --line:#e3e7df; --paper:#f5f6f3; --card:#fff;
   --green:#315f49; --pale:#e8f0e9; --gold:#c99848; --red:#b74b47;
   --board-border:#4a554b; --cell-border:#dfe3dc; --cell-strong:#778177;
-  --given:#343a34; --sel-bg:#dbe9dd; --rel-bg:#f1f5f0; --same-bg:#e8f0e9;
+  --given:#2563a6; --input-ink:#111814; --sel-bg:#dbe9dd; --rel-bg:#f1f5f0; --same-bg:#c8dfcb;
   --conflict-bg:#fcebea; --notes:#788178;
   --ctrl-ink:#50584f; --hover-border:#9db19e; --hover-bg:#f6faf6;
   --num-ink:#364139; --track:#e4e8e1; --level-ink:#727970; --locked:#c5c9c2;
@@ -17,7 +17,7 @@
     --ink:#e8ece6; --muted:#9aa39a; --line:#3a423b; --paper:#1c211d; --card:#262c27;
     --green:#8fceb0; --pale:#2b362f; --gold:#d8ab62; --red:#e0908a;
     --board-border:#5a6a5c; --cell-border:#3a423b; --cell-strong:#5a6a5c;
-    --given:#c6cec6; --sel-bg:#33453a; --rel-bg:#2a322c; --same-bg:#2e3a32;
+    --given:#8fc5ff; --input-ink:#edf4ee; --sel-bg:#33453a; --rel-bg:#2a322c; --same-bg:#405943;
     --conflict-bg:#452a28; --notes:#8a948a;
     --ctrl-ink:#b8c0b8; --hover-border:#5a6a5c; --hover-bg:#2a322c;
     --num-ink:#d0d8d0; --track:#333b34; --level-ink:#8a948a; --locked:#4a544c;
@@ -30,7 +30,7 @@ html.dark{
   --ink:#e8ece6; --muted:#9aa39a; --line:#3a423b; --paper:#1c211d; --card:#262c27;
   --green:#8fceb0; --pale:#2b362f; --gold:#d8ab62; --red:#e0908a;
   --board-border:#5a6a5c; --cell-border:#3a423b; --cell-strong:#5a6a5c;
-  --given:#c6cec6; --sel-bg:#33453a; --rel-bg:#2a322c; --same-bg:#2e3a32;
+  --given:#8fc5ff; --input-ink:#edf4ee; --sel-bg:#33453a; --rel-bg:#2a322c; --same-bg:#405943;
   --conflict-bg:#452a28; --notes:#8a948a;
   --ctrl-ink:#b8c0b8; --hover-border:#5a6a5c; --hover-bg:#2a322c;
   --num-ink:#d0d8d0; --track:#333b34; --level-ink:#8a948a; --locked:#4a544c;
@@ -109,7 +109,7 @@ main{display:grid;grid-template-columns:230px minmax(330px,540px) 1fr;gap:40px;a
 
 /* ===== 棋盘 ===== */
 .board{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(9,minmax(0,1fr));border:2px solid var(--board-border);border-radius:5px;overflow:hidden;background:var(--card);aspect-ratio:1;width:100%;max-width:520px;margin-inline:auto;touch-action:manipulation}
-.cell{border:0;border-right:1px solid var(--cell-border);border-bottom:1px solid var(--cell-border);border-radius:0;background:var(--card);min-width:0;position:relative;display:grid;place-items:center;font:500 clamp(16px,3.3vw,25px)/1 inherit;color:var(--green);cursor:pointer;padding:0}
+.cell{border:0;border-right:1px solid var(--cell-border);border-bottom:1px solid var(--cell-border);border-radius:0;background:var(--card);min-width:0;position:relative;display:grid;place-items:center;font:650 clamp(16px,3.3vw,25px)/1 inherit;color:var(--input-ink);cursor:pointer;padding:0}
 .cell:nth-child(3n){border-right:2px solid var(--cell-strong)}
 .cell:nth-child(9n){border-right:0}
 .cell:nth-child(n+19):nth-child(-n+27),.cell:nth-child(n+46):nth-child(-n+54){border-bottom:2px solid var(--cell-strong)}
