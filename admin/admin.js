@@ -151,11 +151,11 @@ async function loadUsers(c) {
 }
 function renderUsers(c, d) {
   const rows = (d.users || []).map(u =>
-    '<tr><td>' + u.id + '</td><td>' + esc(u.username) + '</td><td>' + esc(u.nickname || '-') + '</td>' +
-    '<td>' + (u.role === 'admin' ? '<span class="badge badge-admin">管理员</span>' : '普通用户') + '</td>' +
-    '<td>' + (u.status === 1 ? '<span class="badge badge-ok">正常</span>' : '<span class="badge badge-off">封禁</span>') + '</td>' +
-    '<td>Lv.' + u.level + '</td><td>' + u.exp + '</td><td>' + (u.last_login_at || '-') + '</td>' +
-    '<td><div class="actions">' + userActions(u) + '</div></td></tr>').join('');
+    '<tr><td>' + u.id + '</td><td data-label="用户名">' + esc(u.username) + '</td><td data-label="昵称">' + esc(u.nickname || '-') + '</td>' +
+    '<td data-label="角色">' + (u.role === 'admin' ? '<span class="badge badge-admin">管理员</span>' : '普通用户') + '</td>' +
+    '<td data-label="状态">' + (u.status === 1 ? '<span class="badge badge-ok">正常</span>' : '<span class="badge badge-off">封禁</span>') + '</td>' +
+    '<td data-label="等级">Lv.' + u.level + '</td><td data-label="经验">' + u.exp + '</td><td data-label="最近登录">' + (u.last_login_at || '-') + '</td>' +
+    '<td data-label="操作"><div class="actions">' + userActions(u) + '</div></td></tr>').join('');
   $('#user-table').innerHTML =
     '<div class="table-wrap"><table><thead><tr><th>ID</th><th>用户名</th><th>昵称</th><th>角色</th><th>状态</th><th>等级</th><th>经验</th><th>最近登录</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<div class="pager"><button id="prev"' + (d.page <= 1 ? ' disabled' : '') + '>上一页</button>' +

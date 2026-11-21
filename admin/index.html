@@ -91,26 +91,54 @@ tr:hover td{background:var(--hover)}
 .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px}
 /* ===== 移动端适配 ===== */
 @media(max-width:768px){
+  body{overflow-x:hidden}
   .login-card{padding:28px 22px}
   .admin{flex-direction:column}
-  .sidebar{width:100%;height:auto;position:static;border-right:0;border-bottom:1px solid var(--line);padding:10px 0}
-  .sidebar .logo{padding:4px 16px 10px}
-  .nav{display:flex;gap:4px;overflow-x:auto;padding:6px 10px;-webkit-overflow-scrolling:touch}
+  .sidebar{width:100%;height:auto;position:sticky;top:0;z-index:20;border-right:0;border-bottom:1px solid var(--line);padding:8px 0;background:rgba(255,255,255,.96);box-shadow:0 2px 12px rgba(32,37,31,.05)}
+  .sidebar .logo{padding:3px 16px 8px;display:flex;align-items:baseline;gap:8px}
+  .sidebar .logo small{margin-top:0}
+  .nav{display:flex;gap:6px;overflow-x:auto;padding:5px 10px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .nav::-webkit-scrollbar{display:none}
   .nav li{margin-bottom:0;flex:none}
-  .nav button{white-space:nowrap;padding:8px 12px;font-size:13px}
-  .main{padding:18px 12px;max-width:100%}
-  .topbar{flex-direction:column;align-items:flex-start;gap:4px}
+  .nav button{white-space:nowrap;padding:9px 13px;font-size:13px;min-height:38px}
+  .main{width:100%;padding:16px 12px 28px;max-width:100%}
+  .topbar{flex-direction:column;align-items:flex-start;gap:6px;margin-bottom:16px;padding:2px 2px}
   .main h2{font-size:18px}
+  .main .desc{font-size:12px;margin-bottom:0}
+  .topbar .who{font-size:12px;background:var(--pale);color:var(--green);padding:4px 9px;border-radius:999px}
   .grid{grid-template-columns:repeat(2,1fr);gap:10px}
-  .stat{padding:14px}
+  .stat{padding:13px 12px;border-radius:10px}
   .stat .num{font-size:22px}
   .card{padding:14px;border-radius:10px}
+  .toolbar{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .toolbar input{grid-column:1/-1;width:100%;min-width:0;padding:10px 11px}
+  .toolbar select{width:100%;min-width:0;padding:10px 9px}
+  .toolbar .btn{min-height:40px}
   th,td{padding:8px 10px;font-size:12px}
-  .actions{flex-wrap:wrap}
-  .toolbar{gap:8px}
-  .toolbar input,.toolbar select{flex:1;min-width:120px}
+  #user-table .table-wrap{overflow:visible}
+  #user-table table,#user-table tbody{display:block}
+  #user-table thead{display:none}
+  #user-table tr{display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin-bottom:9px}
+  #user-table td{display:flex;align-items:center;justify-content:space-between;gap:12px;border:0;padding:6px 0;white-space:normal;text-align:right}
+  #user-table td::before{content:attr(data-label);color:var(--muted);font-size:11px;text-align:left;flex:none}
+  #user-table td:first-child{display:none}
+  #user-table td:last-child{display:block;text-align:left;padding-top:8px;border-top:1px solid var(--line);margin-top:3px}
+  #user-table td:last-child::before{display:block;margin-bottom:7px}
+  #user-table .actions{display:flex;gap:6px;flex-wrap:wrap}
+  #user-table .actions .btn{min-height:36px}
+  .table-wrap{border:0}
+  .table-wrap table{min-width:620px}
+  #user-table .table-wrap table{min-width:0}
   .pager{flex-wrap:wrap}
+  .pager button{min-height:36px;padding:7px 13px}
+  .daily{height:105px}
   #confirm-modal>div{width:calc(100vw - 32px);max-width:340px}
+}
+@media(max-width:420px){
+  .grid{gap:8px}
+  .stat{padding:11px 9px}
+  .stat .num{font-size:20px}
+  .nav button{padding-left:11px;padding-right:11px}
 }
 </style>
 </head>
@@ -178,6 +206,6 @@ tr:hover td{background:var(--hover)}
   </div>
 </div>
 
-<script src="admin.js?v=8"></script>
+<script src="admin.js?v=9"></script>
 </body>
 </html>
