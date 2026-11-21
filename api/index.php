@@ -34,9 +34,6 @@ if ($r === '') {
 }
 $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
 
-// 确保安全表/列已就位（token_version 等），须在 current_user 之前执行
-ensure_security_schema();
-
 try {
     if ($method === 'POST' && $r === 'auth/register') {
         if (!rate_limit_check('register', @$_SERVER['REMOTE_ADDR'], 5, 3600)) fail('注册频率过高', 429);
@@ -151,7 +148,7 @@ try {
     }
     if ($method === 'POST' && $r === 'daily/complete') {
         $rateUser = current_user();
-        if (!rate_limit_check('daily_complete', 'uid:' . (int)$rateUser['uid'], 2, 86400)) fail('每日挑战完成频率过高', 429);
+        if (!rate_limit_check('daily_complete', 'uid:' . (int)$rateUser['uid'], 20, 60)) fail('每日挑战提交过于频繁', 429);
         return daily_complete();
     }
     // 后台管理（阶段五）

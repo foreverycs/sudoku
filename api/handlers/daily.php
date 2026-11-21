@@ -125,22 +125,50 @@ function daily_puzzle($dateStr) {
 
 /** 每日题目缓存目录（运行时生成，不在 git） */
 function daily_cache_dir() {
-    $dir = defined('PRIVATE_DATA_DIR') ? rtrim(PRIVATE_DATA_DIR, '/\\') . '/daily' : '';
-    if ($dir === '') $dir = rtrim(sys_get_temp_dir(), '/\\') . '/sudoku-daily-' . substr(sha1(__DIR__), 0, 12);
-    if (!is_dir($dir)) @mkdir($dir, 0700, true);
-    @chmod($dir, 0700);
-    return $dir;
+    $dirs = array();
+    if (defined('PRIVATE_DATA_DIR') && trim(PRIVATE_DATA_DIR) !== '') $dirs[] = rtrim(PRIVATE_DATA_DIR, '/\\') . '/daily';
+    $dirs[] = rtrim(sys_get_temp_dir(), '/\\') . '/sudoku-daily-' . substr(sha1(__DIR__), 0, 12);
+    $roots = array(realpath(__DIR__ . '/../..'));
+    if (!empty($_SERVER['DOCUMENT_ROOT'])) $roots[] = realpath($_SERVER['DOCUMENT_ROOT']);
+    foreach ($dirs as $dir) {
+        if (!is_dir($dir)) @mkdir($dir, 0700, true);
+        $real = realpath($dir);
+        if (!$real || !is_dir($real) || !is_writable($real)) continue;
+        $safe = true;
+        $path = str_replace('\\', '/', $real);
+        if (DIRECTORY_SEPARATOR === '\\') $path = strtolower($path);
+        foreach ($roots as $root) {
+            if (!$root) continue;
+            $root = rtrim(str_replace('\\', '/', $root), '/');
+            if (DIRECTORY_SEPARATOR === '\\') $root = strtolower($root);
+            if ($path === $root || strpos($path, $root . '/') === 0) { $safe = false; break; }
+        }
+        if (!$safe) continue;
+        @chmod($real, 0700);
+        return $real;
+    }
+    return '';
 }
 
 /** 当日题目（按日期文件缓存，避免同一天多次请求重复生成；写失败则每次重新生成） */
 function daily_puzzle_cached($dateStr) {
-    $file = daily_cache_dir() . '/' . $dateStr . '.json';
-    if (is_file($file)) {
-        $j = json_decode((string)@file_get_contents($file), true);
-        if (is_array($j) && isset($j['cells'], $j['answer'])) return $j;
+    $dir = daily_cache_dir();
+    if ($dir !== '') {
+        $file = $dir . '/' . $dateStr . '.json';
+        if (is_file($file)) {
+            $j = json_decode((string)@file_get_contents($file), true);
+            if (is_array($j) && isset($j['cells'], $j['answer'])) return $j;
+        }
     }
     $p = daily_puzzle($dateStr);
-    if (@file_put_contents($file, json_encode($p)) !== false) @chmod($file, 0600);
+    if ($dir !== '') {
+        $tmp = @tempnam($dir, 'daily-');
+        if ($tmp !== false) {
+            @chmod($tmp, 0600);
+            if (@file_put_contents($tmp, json_encode($p)) !== false) @rename($tmp, $file);
+            if (is_file($tmp)) @unlink($tmp);
+        }
+    }
     return $p;
 }
 
@@ -162,7 +190,6 @@ function daily_get() {
     ok(array(
         'date'    => $today,
         'cells'   => $p['cells'],
-        'answer'  => $p['answer'],
         'streak'  => daily_streak($uid),
         'solved'  => $solved,
         'history' => $history,

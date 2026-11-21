@@ -1,18 +1,19 @@
 <?php
 /**
  * 安全与迁移助手（兼容 PHP 5.4）
- * - ensure_security_schema()：确保幂等结算表 / revision 列存在（存量部署自迁移）
+ * - ensure_security_schema()：仅供命令行显式迁移使用
  * - rate_limit_check()：文件 + flock 简易速率限制
  */
 require_once __DIR__ . '/db.php';
 
 /**
- * 确保安全相关表结构存在。存量部署首次请求时自动迁移：
+ * 确保安全相关表结构存在。部署时通过 php api/migrate.php 显式运行：
  *   1) game_attempts 表（幂等结算）
  *   2) game_progress.revision 列（乐观锁）
- * 每次请求最多执行一次（static）。
+ * 仅供部署脚本调用，脚本内重复调用最多执行一次。
  */
 function ensure_security_schema() {
+    if (PHP_SAPI !== 'cli') throw new Exception('数据库迁移仅允许在命令行执行');
     static $done = false;
     if ($done) return;
     $done = true;
@@ -64,9 +65,12 @@ function ensure_security_schema() {
     try {
         $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "friends" AND COLUMN_NAME = "status"');
         $st->execute();
-        if ((int)$st->fetchColumn() === 0) $pdo->exec('ALTER TABLE friends ADD COLUMN status TINYINT UNSIGNED NOT NULL DEFAULT 1, ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+        if ((int)$st->fetchColumn() === 0) $pdo->exec('ALTER TABLE friends ADD COLUMN status TINYINT UNSIGNED NOT NULL DEFAULT 1');
+        $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "friends" AND COLUMN_NAME = "updated_at"');
+        $st->execute();
+        if ((int)$st->fetchColumn() === 0) $pdo->exec('ALTER TABLE friends ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
     } catch (Exception $e) {
-        // Existing friendship rows stay accepted during migration.
+        throw $e;
     }
     try {
         $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "friends" AND COLUMN_NAME = "requested_by"');
@@ -74,7 +78,7 @@ function ensure_security_schema() {
         if ((int)$st->fetchColumn() === 0) $pdo->exec('ALTER TABLE friends ADD COLUMN requested_by INT UNSIGNED NULL');
         $pdo->exec('UPDATE friends SET requested_by = user_a WHERE status = 0 AND requested_by IS NULL');
     } catch (Exception $e) {
-        // Pending legacy rows default to user_a as their initiator.
+        throw $e;
     }
 
     // Optional index for per-level best-time aggregation in leaderboards.
@@ -83,7 +87,7 @@ function ensure_security_schema() {
         $st->execute();
         if ((int)$st->fetchColumn() === 0) $pdo->exec('CREATE INDEX idx_records_level_user_seconds ON game_records (level, user_id, seconds)');
     } catch (Exception $e) {
-        // Ranking remains correct without the optional performance index.
+        throw $e;
     }
 
     // revision 列（MySQL/MariaDB 通用：先查 information_schema 再 ALTER）
@@ -94,7 +98,7 @@ function ensure_security_schema() {
             $pdo->exec('ALTER TABLE game_progress ADD COLUMN revision BIGINT UNSIGNED NOT NULL DEFAULT 1');
         }
     } catch (Exception $e) {
-        // information_schema 查询失败则忽略，后续写入按 COALESCE(revision,1) 兜底
+        throw $e;
     }
 
     // token_version 列（改密码后使旧 JWT 即时失效）
@@ -105,7 +109,7 @@ function ensure_security_schema() {
             $pdo->exec('ALTER TABLE users ADD COLUMN token_version INT UNSIGNED NOT NULL DEFAULT 0');
         }
     } catch (Exception $e) {
-        // 列已存在或查询失败则忽略
+        throw $e;
     }
 }
 

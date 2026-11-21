@@ -50,6 +50,7 @@ try {
             ->execute([ADMIN_USER, ph_hash(ADMIN_PASS), '管理员', 'admin']);
     }
 
+    // 安装后运行 php api/migrate.php 创建附加表和字段。
     // 勋章种子
     seed_achievements($pdo);
 

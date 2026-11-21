@@ -6,7 +6,6 @@ require_once __DIR__ . '/security.php';
 
 $apply = in_array('--apply', isset($argv) ? $argv : array(), true);
 $pdo = db();
-ensure_security_schema();
 $cutoff = date('Y-m-d H:i:s', time() - 180 * 86400);
 $st = $pdo->prepare('SELECT COUNT(*) FROM game_attempts WHERE completed_at IS NOT NULL AND completed_at < ?');
 $st->execute(array($cutoff));

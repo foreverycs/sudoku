@@ -6,9 +6,8 @@ require_once __DIR__ . '/../security.php';
 
 /** GET progress 拉取当前用户全部云进度（含 revision 乐观锁版本） */
 function progress_all() {
-    $c = current_user();          // 认证优先（未登录 401），避免未认证请求触发 DDL
-    ensure_security_schema();     // 确保 revision 列存在（迁移与顺序无关）
-    $st = db()->prepare('SELECT level, cells, notes, seconds, updated_at, COALESCE(revision,1) AS rev FROM game_progress WHERE user_id = ?');
+    $c = current_user();
+    $st = db()->prepare('SELECT level, cells, notes, seconds, updated_at, UNIX_TIMESTAMP(updated_at) AS updated_ts, COALESCE(revision,1) AS rev FROM game_progress WHERE user_id = ?');
     $st->execute(array($c['uid']));
     $rows = $st->fetchAll();
     $map = array();
@@ -19,6 +18,7 @@ function progress_all() {
             'notes'     => is_array($notes) ? $notes : array(),
             'seconds'   => (int)$r['seconds'],
             'updatedAt' => (string)$r['updated_at'],
+            'updatedMs' => (int)$r['updated_ts'] * 1000,
             'revision'  => (int)$r['rev'],
         );
     }
@@ -49,7 +49,6 @@ function progress_save($level) {
     if ($noteCount > 500) fail('笔记过多');
     $notesJson = json_encode($notes);
 
-    ensure_security_schema();
     $pdo = db();
     $uid = (int)$c['uid'];
 
@@ -60,7 +59,7 @@ function progress_save($level) {
         $st->execute(array($uid, $level));
         $existing = $st->fetch();
 
-        if ($existing && $baseRevision > 0 && (int)$existing['rev'] !== $baseRevision) {
+        if ($existing && (int)$existing['rev'] !== $baseRevision) {
             // 冲突：回滚并返回最新云端记录，客户端合并后以新 revision 重推
             $latestNotes = $existing['notes'] ? json_decode($existing['notes'], true) : array();
             $extra = array(
@@ -124,7 +123,6 @@ function progress_save($level) {
 /** GET progress/{level}/history：最近 10 个自动快照 */
 function progress_history($level) {
     $c = current_user();
-    ensure_security_schema();
     if ($level < 1 || $level > 100) fail('关卡无效');
     $st = db()->prepare('SELECT id, seconds, revision, created_at, cells, notes FROM game_progress_history WHERE user_id = ? AND level = ? ORDER BY id DESC LIMIT 10');
     $st->execute(array((int)$c['uid'], $level));
@@ -146,7 +144,6 @@ function progress_history($level) {
 /** POST progress/{level}/restore：恢复快照；仍使用 baseRevision 防止覆盖恢复期间的新改动 */
 function progress_restore($level) {
     $c = current_user();
-    ensure_security_schema();
     $b = body();
     $historyId = isset($b['historyId']) ? (int)$b['historyId'] : 0;
     $baseRevision = isset($b['baseRevision']) ? (int)$b['baseRevision'] : 0;

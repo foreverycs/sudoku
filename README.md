@@ -58,13 +58,21 @@ npx serve .
 1. 将项目文件上传到网站根目录（如 `/www/wwwroot/sudoku.southerly.top/`）。
 2. 编辑 `api/config.php`，配置数据库连接、`JWT_SECRET`（改为随机长串）、初始管理员 `ADMIN_PASS`。
    > `config.php` 已在 `.gitignore`，请勿提交真实凭据。
-3. 访问一次 `https://你的域名/api/install.php` 完成初始化（**建表 + 创建管理员 + 写入 11 枚勋章种子**），**完成后删除 `install.php`**。
+3. 访问一次 `https://你的域名/api/install.php` 完成初始化（建基础表、创建管理员并写入勋章种子）。然后在服务器命令行运行 `php api/migrate.php` 创建/升级附加表和字段；迁移可重复执行。完成后删除 `install.php`。
 4. 路由说明：
    - **Nginx（宝塔）免伪静态**：接口走查询参数 `?r=xxx`，无需额外配置。
    - **Apache**：`api/.htaccess` 已内置重写，支持路径式 `/api/xxx`。
 5. **PWA 离线**：`manifest.json` + `sw.js` 已就绪，需 HTTPS（已满足）。首次访问后 Service Worker 自动缓存应用外壳，可「添加到主屏幕」。
-   > 更新资源版本号（如 `?v=22`）时，同步修改 `sw.js` 顶部的 `ASSETS` 列表，并把 `CACHE` 常量改为新版本号以触发更新。
+    > 更新资源版本号时递增 `index.html` 对应的 `?v=`，并递增 `sw.js` 的 `CACHE` 常量；资源列表会从页面自动解析。
 6. **成绩分享**：完成弹窗点「📤 分享成绩」生成 canvas 卡片，纯前端（无后端依赖）；卡片含排名/新纪录自动判定，未上榜显示「已完成」。
+
+### 升级注意事项
+- 更新此版本前，先在服务器项目目录运行 `php api/migrate.php`；执行成功后再切换新版 API。日常 API 请求不再执行数据库结构变更。
+- 每日挑战只返回题面，填满后由服务器校验；每日模式不再直接提示答案，也不会在服务器确认前记为完成。
+- 正式闯关按服务器通关记录解锁，离线本地完成不等于服务器已确认通关。
+- 本地待同步的棋盘（含擦除、笔记删除）不会被拉取覆盖。若两端同时修改，将提示是否用本地更新云端；取消则暂停该关上传，下次登录重新确认。覆盖前的云端版本可在存档历史中恢复。
+- `PRIVATE_DATA_DIR` 应指向网站目录之外的可写目录。每日题目缓存会检查真实路径；不安全或不可写时回退系统临时目录，仍不可用则不写缓存。
+- 如果旧版本曾在网站目录内生成题目缓存，新版不会继续使用这些文件，但上线前仍须清理旧缓存或配置服务器禁止访问，避免旧答案文件继续公开。
 
 ### 后台管理
 访问 `https://你的域名/admin/`，用 `config.php` 里的管理员账号登录（`role=admin`）。
@@ -109,6 +117,7 @@ sudoku/
 │   ├── compat.php        # PHP 5.4 兼容层（password_hash 等价、ph_verify）
 │   ├── resp.php          # JSON 响应助手（ok/fail/body）
 │   ├── install.php       # 首次初始化（建表 + 管理员 + 勋章种子）
+│   ├── migrate.php       # 部署时运行的命令行数据库迁移
 │   ├── schema.sql        # 数据库结构
 │   ├── .htaccess         # Apache 路径式重写
 │   └── handlers/         # auth.php / progress.php / game.php / daily.php / profile.php / admin.php

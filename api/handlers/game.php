@@ -39,15 +39,23 @@ function gen_uuid() {
     );
 }
 
+/** 依据服务端历史最高完成关卡检查解锁范围，允许重玩。 */
+function require_unlocked_level($uid, $level) {
+    $st = db()->prepare('SELECT COALESCE(MAX(level),0) FROM game_records WHERE user_id = ?');
+    $st->execute(array((int)$uid));
+    $unlocked = min(100, (int)$st->fetchColumn() + 1);
+    if ($level > $unlocked) fail('该关尚未解锁，请先完成前面的关卡', 403);
+}
+
 /** POST game/start：开始一次服务端尝试，返回幂等 attempt_key */
 function game_start() {
     $c = current_user();
     $b = body();
     $level = isset($b['level']) ? (int)$b['level'] : 0;
     if ($level < 1 || $level > 100) fail('关卡无效');
-    ensure_security_schema();
     $pdo = db();
     $uid = (int)$c['uid'];
+    require_unlocked_level($uid, $level);
     $attemptKey = gen_uuid();
     try {
     $pdo->prepare('INSERT INTO game_attempts (user_id, level, attempt_key, started_at) VALUES (?,?,?,NOW())')
@@ -64,7 +72,6 @@ function game_start() {
 /** POST daily/start：开始当日挑战的服务端计时 */
 function daily_start() {
     $c = current_user();
-    ensure_security_schema();
     $pdo = db();
     $key = gen_uuid();
     $pdo->prepare('INSERT INTO game_attempts (user_id, level, attempt_key, started_at) VALUES (?,0,?,NOW())')
@@ -122,7 +129,6 @@ function game_complete() {
     if ($attemptKey === '' || strlen($attemptKey) > 64) fail('缺少 attempt_key');
     if (!preg_match('/^[0-9]{81}$/', $cells)) fail('棋盘数据无效');
 
-    ensure_security_schema();
     $pdo = db();
     $uid = (int)$c['uid'];
 
@@ -135,6 +141,7 @@ function game_complete() {
         if (is_array($cached) && isset($cached['expGain'])) return ok($cached);
     }
     if (!$attempt) fail('服务端尝试不存在，请重新开始本关', 409);
+    require_unlocked_level($uid, $level);
 
     // 校验提交棋盘 == 权威答案；失败不标记完成（允许同 key 重试修正）
     if (!validate_solution($cells, $level)) {

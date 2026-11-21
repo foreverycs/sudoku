@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS daily_records (
   CONSTRAINT fk_daily_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 游戏尝试记录（幂等结算 + 防刷分；存量部署由 api/security.php 自动迁移）
+-- 游戏尝试记录（幂等结算 + 防刷分；存量部署运行 php api/migrate.php 迁移）
 CREATE TABLE IF NOT EXISTS game_attempts (
   id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id         INT UNSIGNED NOT NULL,
