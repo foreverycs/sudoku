@@ -141,11 +141,10 @@ console.log('线索范围:', Math.min(...levels.map(x => x.clues)), '~', Math.ma
 console.log('难度分范围:', Math.min(...levels.map(x => x.score)), '~', Math.max(...levels.map(x => x.score)));
 console.log('不同题目数:', new Set(levels.map(x => x.c.join(''))).size);
 
-// 输出数据文件：每关 81 字符 clue（0 表示空）+ 81 字符 answer
+// 输出数据文件：每关只包含 81 字符 clue（0 表示空）；答案由 gen-answers.js 写入服务端
 const rows = levels.map(lv => {
   const c = lv.c.map(v => v).join('');
-  const a = lv.a.map(v => v).join('');
-  return `  {c:"${c}",a:"${a}"}`;
+  return `  {c:"${c}"}`;
 });
 const out = `// 自动生成题库，共 ${levels.length} 关，按难度从易到难排序（脚本：gen-data.js）\nwindow.SUDOKU_DATA=[\n${rows.join(',\n')}\n];\n`;
 fs.writeFileSync(path.join(__dirname, 'sudoku-data.js'), out, 'utf8');

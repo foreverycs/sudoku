@@ -184,7 +184,7 @@
     level = clamp(l, 1, N);
     const d = DATA[level - 1];
     const clue = d ? d.c.split('').map(Number) : [];
-    solution = d ? d.a.split('').map(Number) : [];
+    solution = [];
     const st = saved.boards ? saved.boards[level] : null;
     const cb = st && st.cells;
     board = (Array.isArray(cb) && cb.length === 81 && cb.every(x => x >= 0 && x <= 9)) ? cb.slice() : clue.slice();
@@ -324,7 +324,6 @@
       for (let d = 1; d <= 9; d++) { const s = document.createElement('span'); s.textContent = notes[i].has(d) ? d : ''; box.append(s); }
       b.append(box);
     } else if (v) {
-      if (!dailyMode && !challenge && !given[i] && v !== solution[i]) b.classList.add('error');
       if (!challenge && !given[i] && duplicate(i, v)) b.classList.add('conflict');
     }
   }
@@ -376,13 +375,14 @@
         else { sfx('place'); say('已填入 ' + d); }
         return;
       }
-      if (board.every((x, i) => x === solution[i])) { win(); return; }
+      if (board.every(x => x >= 1 && x <= 9)) {
+        if (currentUser) settleComplete(seconds);
+        else say('请登录后提交本关成绩');
+        saveGame(); render(); return;
+      }
       const left = board.filter(x => !x).length;
-      const correct = d === solution[selected];
-      sfx(correct ? 'place' : 'wrong');
-      if (left === 0) say(challenge ? '已填满，请检查是否正确' : '已填满，但有错误，请检查标红的格子');
-      else if (correct) say('正确，还剩 ' + left + ' 格');
-      else say(challenge ? '已填入 ' + d : '再检查一下这个数字');
+      sfx('place');
+      say(challenge ? '已填入 ' + d : '还剩 ' + left + ' 格');
     }
     saveGame(); render();
   }
@@ -474,12 +474,7 @@
   $('notes').onclick = () => { noteMode = !noteMode; $('notes').classList.toggle('active', noteMode); say(noteMode ? '笔记模式已开启' : '笔记模式已关闭'); };
   $('hint').onclick = () => {
     if (dailyMode) { say('每日挑战不提供答案提示，请依据行、列和宫自行推理'); return; }
-    if (selected < 0 || given[selected]) { say('先选中一个空格'); return; }
-    if (board[selected] === solution[selected]) { say('这个格子已经填对了'); return; }
-    history.push({ board: board.slice(), notes: notes.map(s => new Set(s)) });
-    board[selected] = solution[selected]; notes[selected].clear();
-    sfx('hint');
-    saveGame(); render(); say('已填入一个正确数字');
+    say('普通关卡答案由服务器校验，请填满棋盘后提交');
   };
   $('continue').onclick = () => loadLevel(level);
   $('daily-btn').onclick = () => loadDaily();
@@ -1046,7 +1041,10 @@
     el.style.display = '';
   }
 
+  let levelSubmitting = false;
   async function settleComplete(seconds) {
+    if (levelSubmitting) return;
+    levelSubmitting = true;
     try {
       let key = attemptKey;
       if (!key) { try { key = await ensureAttemptStarted(); } catch (e) { /* 启动失败则跳过 */ } }
@@ -1070,6 +1068,7 @@
         $('modal-time').textContent = fmt(seconds);
         saveGame();
       }
+      win();
       renderModalGain(d);
       if (d.newAchievements && d.newAchievements.length) {
         sfx('unlock');
@@ -1077,7 +1076,8 @@
       }
       if (d.levelUp) toast('🎉 升级到 Lv.' + d.level + '！');
       loadAchievements();
-    } catch (e) { /* 结算失败不影响本地通关 */ }
+    } catch (e) { say('本关验证失败：' + (e.message || '请检查网络后重试')); }
+    finally { levelSubmitting = false; }
   }
 
   // 每个账号/关卡串行上传；冲突时用户确认后才覆盖云端，旧云端由服务端留快照。

@@ -30,6 +30,18 @@ function validate_solution($submittedCells, $level) {
 
 /** 生成 UUID v4（简易版，PHP 5.4 兼容） */
 function gen_uuid() {
+    if (function_exists('random_bytes')) {
+        $b = random_bytes(16);
+        $b[6] = chr((ord($b[6]) & 15) | 64); $b[8] = chr((ord($b[8]) & 63) | 128);
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($b), 4));
+    }
+    if (function_exists('openssl_random_pseudo_bytes')) {
+        $strong = false; $b = openssl_random_pseudo_bytes(16, $strong);
+        if ($b !== false && $strong) {
+            $b[6] = chr((ord($b[6]) & 15) | 64); $b[8] = chr((ord($b[8]) & 63) | 128);
+            return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($b), 4));
+        }
+    }
     return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
         mt_rand(0, 65535), mt_rand(0, 65535),
         mt_rand(0, 65535),

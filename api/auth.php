@@ -32,6 +32,7 @@ function current_user() {
             $tv = isset($p['tv']) ? (int)$p['tv'] : 0;
             if ($tv !== (int)$u['token_version']) fail('登录已失效，请重新登录', 401);
             $p['role'] = $u['role']; // 刷新角色
+            $GLOBALS['api_log_uid'] = (int)$p['uid'];
             return $p;
         }
     }

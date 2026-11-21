@@ -1,5 +1,6 @@
 <?php
 /** JSON 响应助手（PHP 5.4 兼容，无类型提示） */
+require_once __DIR__ . '/log.php';
 
 function json_out($data, $code = 200) {
     http_response_code((int)$code);
@@ -13,6 +14,7 @@ function ok($data = null) {
 }
 
 function fail($msg, $code = 400, $extra = null) {
+    if ((int)$code >= 500) api_log_error($msg, $code);
     $out = array('ok' => false, 'error' => $msg);
     if ($extra !== null) $out['extra'] = $extra;
     json_out($out, $code);

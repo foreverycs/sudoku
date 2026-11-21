@@ -169,5 +169,6 @@ try {
     if ($method === 'GET'  && $r === 'admin/logs')            return admin_logs();
     fail('接口不存在', 404);
 } catch (Exception $e) {
+    api_log_error($e->getMessage(), 500);
     fail('服务器错误：' . $e->getMessage(), 500);
 }

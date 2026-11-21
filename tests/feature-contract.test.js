@@ -108,3 +108,14 @@ test('admin password reset protects admins, uses strong randomness, and invalida
   assert.match(router, /admin\/users\/\(\\d\+\)\/password/);
   assert.match(read('admin/admin.js'), /resetUserPassword/);
 });
+
+test('normal puzzle answers stay server-side and API errors use redacted daily logs', () => {
+  assert.doesNotMatch(read('sudoku-data.js'), /,a:"[0-9]{81}"/);
+  assert.doesNotMatch(js, /\.a\.split|solution = d/);
+  assert.match(read('api/sudoku-answers.php'), /return array\(/);
+  const log = read('api/log.php');
+  assert.match(log, /PRIVATE_DATA_DIR/);
+  assert.match(log, /REQUEST_METHOD/);
+  assert.doesNotMatch(log, /php:\/\/input|Authorization|password/);
+  assert.match(read('api/resp.php'), /api_log_error\(\$msg, \$code\)/);
+});
