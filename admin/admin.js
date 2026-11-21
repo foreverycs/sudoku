@@ -6,6 +6,21 @@ const USER_KEY = 'sudoku-admin-user';
 
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
+const adminPage = $('#admin-page');
+
+function closeMobileMenu() {
+  if (!adminPage) return;
+  adminPage.classList.remove('menu-open');
+  const toggle = $('#menu-toggle');
+  if (toggle) { toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-label', '打开菜单'); }
+}
+
+$('#menu-toggle').addEventListener('click', () => {
+  const open = adminPage.classList.toggle('menu-open');
+  $('#menu-toggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+  $('#menu-toggle').setAttribute('aria-label', open ? '关闭菜单' : '打开菜单');
+});
+$('#menu-backdrop').addEventListener('click', closeMobileMenu);
 
 let token = localStorage.getItem(TOKEN_KEY) || '';
 let adminUser = null;
@@ -66,6 +81,7 @@ $('#nav').addEventListener('click', e => {
   $$('#nav button').forEach(x => x.classList.remove('active'));
   b.classList.add('active');
   const tab = b.dataset.tab;
+  closeMobileMenu();
   $('#page-title').textContent = TITLES[tab][0];
   $('#page-desc').textContent = TITLES[tab][1];
   load(tab);

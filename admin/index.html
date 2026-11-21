@@ -94,15 +94,18 @@ tr:hover td{background:var(--hover)}
   body{overflow-x:hidden}
   .login-card{padding:28px 22px}
   .admin{flex-direction:column}
-  .sidebar{width:100%;height:auto;position:sticky;top:0;z-index:20;border-right:0;border-bottom:1px solid var(--line);padding:8px 0;background:rgba(255,255,255,.96);box-shadow:0 2px 12px rgba(32,37,31,.05)}
-  .sidebar .logo{padding:3px 16px 8px;display:flex;align-items:baseline;gap:8px}
+  .sidebar{width:252px;height:100vh;position:fixed;left:0;top:0;z-index:40;border-right:1px solid var(--line);border-bottom:0;padding:16px 0;background:var(--card);box-shadow:8px 0 28px rgba(32,37,31,.12);transform:translateX(-105%);transition:transform .22s ease}
+  .admin.menu-open .sidebar{transform:translateX(0)}
+  .sidebar .logo{padding:3px 18px 16px;display:flex;align-items:baseline;gap:8px}
   .sidebar .logo small{margin-top:0}
-  .nav{display:flex;gap:6px;overflow-x:auto;padding:5px 10px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-  .nav::-webkit-scrollbar{display:none}
+  .nav{display:block;padding:12px 10px}
   .nav li{margin-bottom:0;flex:none}
-  .nav button{white-space:nowrap;padding:9px 13px;font-size:13px;min-height:38px}
+  .nav button{white-space:nowrap;padding:11px 14px;font-size:14px;min-height:42px}
+  .menu-toggle{display:grid;place-items:center;position:fixed;left:12px;top:12px;z-index:35;width:42px;height:42px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--green);font-size:21px;cursor:pointer;box-shadow:0 3px 14px rgba(32,37,31,.08)}
+  .menu-backdrop{display:block;position:fixed;inset:0;z-index:30;background:rgba(20,28,22,.35);opacity:0;pointer-events:none;transition:opacity .22s ease}
+  .admin.menu-open .menu-backdrop{opacity:1;pointer-events:auto}
   .main{width:100%;padding:16px 12px 28px;max-width:100%}
-  .topbar{flex-direction:column;align-items:flex-start;gap:6px;margin-bottom:16px;padding:2px 2px}
+  .topbar{flex-direction:column;align-items:flex-start;gap:6px;margin-bottom:16px;padding:2px 2px 2px 58px;min-height:42px}
   .main h2{font-size:18px}
   .main .desc{font-size:12px;margin-bottom:0}
   .topbar .who{font-size:12px;background:var(--pale);color:var(--green);padding:4px 9px;border-radius:999px}
@@ -134,6 +137,7 @@ tr:hover td{background:var(--hover)}
   .daily{height:105px}
   #confirm-modal>div{width:calc(100vw - 32px);max-width:340px}
 }
+@media(min-width:769px){.menu-toggle,.menu-backdrop{display:none}}
 @media(max-width:420px){
   .grid{gap:8px}
   .stat{padding:11px 9px}
@@ -159,6 +163,8 @@ tr:hover td{background:var(--hover)}
 
 <!-- 后台框架 -->
 <div class="admin hidden" id="admin-page">
+  <button class="menu-toggle" id="menu-toggle" aria-label="打开菜单" aria-expanded="false">☰</button>
+  <div class="menu-backdrop" id="menu-backdrop"></div>
   <aside class="sidebar">
     <div class="logo">管理后台<small>数独·静心一刻</small></div>
     <ul class="nav" id="nav">
@@ -206,6 +212,6 @@ tr:hover td{background:var(--hover)}
   </div>
 </div>
 
-<script src="admin.js?v=9"></script>
+<script src="admin.js?v=10"></script>
 </body>
 </html>
