@@ -65,6 +65,12 @@ test('leaderboards accept only all/week/month periods and return the selected pe
   assert.match(js, /period=' \+ leaderPeriod/);
 });
 
+test('global leaderboard includes admins while friends leaderboard remains user-only', () => {
+  const globalLeaderboard = game.slice(game.indexOf('function leaderboard()'));
+  assert.doesNotMatch(globalLeaderboard, /u\.role = "user"/);
+  assert.match(friends, /u\.role = "user"/);
+});
+
 test('backup manager requires preview and confirmation before restore or clearing', () => {
   assert.match(html, /id="backup-preview"/);
   assert.match(html, /id="backup-import"[^>]*disabled/);

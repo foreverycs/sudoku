@@ -315,7 +315,7 @@ function leaderboard() {
     $st = $pdo->prepare(
         'SELECT u.id, u.username, u.nickname, u.avatar, b.best'
         . ' FROM (' . $bestSql . ') b JOIN users u ON u.id = b.user_id'
-        . ' WHERE u.role = "user" AND u.status = 1'
+        . ' WHERE u.status = 1'
         . ' ORDER BY b.best ASC, u.id ASC LIMIT ' . $limit
     );
     $st->execute(array($level));
@@ -335,7 +335,7 @@ function leaderboard() {
                 $meSt = $pdo->prepare(
                     'SELECT u.id, u.username, u.nickname, u.avatar, b.best'
                     . ' FROM (' . $bestSql . ') b JOIN users u ON u.id = b.user_id'
-                    . ' WHERE u.id = ? AND u.role = "user" AND u.status = 1'
+                    . ' WHERE u.id = ? AND u.status = 1'
                 );
                 $meSt->execute(array($level, $uid));
                 $me = $meSt->fetch();
@@ -343,7 +343,7 @@ function leaderboard() {
                     $me['best'] = (int)$me['best'];
                     $rankSt = $pdo->prepare(
                         'SELECT COUNT(*) + 1 FROM (' . $bestSql . ') b JOIN users u ON u.id = b.user_id'
-                        . ' WHERE u.role = "user" AND u.status = 1 AND (b.best < ? OR (b.best = ? AND u.id < ?))'
+                        . ' WHERE u.status = 1 AND (b.best < ? OR (b.best = ? AND u.id < ?))'
                     );
                     $rankSt->execute(array($level, $me['best'], $me['best'], $uid));
                     $my = array(
