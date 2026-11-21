@@ -28,6 +28,7 @@ function ensure_security_schema() {
         completed_at    DATETIME NULL,
         submitted_cells VARCHAR(81) NULL,
         is_valid        TINYINT(1) NOT NULL DEFAULT 0,
+        used_hint       TINYINT(1) NOT NULL DEFAULT 0,
         result_json     TEXT NULL,
         UNIQUE KEY uq_user_level_key (user_id, level, attempt_key),
         INDEX idx_attempt_user (user_id, level),
@@ -47,6 +48,13 @@ function ensure_security_schema() {
         INDEX idx_history_user_level (user_id, level, id),
         CONSTRAINT fk_history_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+
+    $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "game_attempts" AND COLUMN_NAME = "used_hint"');
+    $st->execute();
+    if ((int)$st->fetchColumn() === 0) $pdo->exec('ALTER TABLE game_attempts ADD COLUMN used_hint TINYINT(1) NOT NULL DEFAULT 0');
+    $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = "game_records" AND COLUMN_NAME = "used_hint"');
+    $st->execute();
+    if ((int)$st->fetchColumn() === 0) $pdo->exec('ALTER TABLE game_records ADD COLUMN used_hint TINYINT(1) NOT NULL DEFAULT 0');
 
     // 双向好友（user_a < user_b 唯一对）
     $pdo->exec('CREATE TABLE IF NOT EXISTS friends (

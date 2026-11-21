@@ -59,6 +59,24 @@ function require_unlocked_level($uid, $level) {
     if ($level > $unlocked) fail('该关尚未解锁，请先完成前面的关卡', 403);
 }
 
+/** POST game/hint：返回当前关卡一个格子的答案，并标记本局使用提示。 */
+function game_hint() {
+    $c = current_user(); $b = body();
+    $level = isset($b['level']) ? (int)$b['level'] : 0;
+    $attemptKey = isset($b['attempt_key']) ? trim((string)$b['attempt_key']) : '';
+    $cell = isset($b['cell']) ? (int)$b['cell'] : -1;
+    if ($level < 1 || $level > 100 || $attemptKey === '' || $cell < 0 || $cell > 80) fail('提示参数无效');
+    require_unlocked_level($c['uid'], $level);
+    $st = db()->prepare('SELECT id, completed_at FROM game_attempts WHERE user_id = ? AND level = ? AND attempt_key = ?');
+    $st->execute(array((int)$c['uid'], $level, $attemptKey));
+    $attempt = $st->fetch();
+    if (!$attempt || $attempt['completed_at']) fail('本局不存在或已完成', 409);
+    $answers = load_sudoku_answers();
+    if (!isset($answers[$level - 1])) fail('题目答案不存在', 500);
+    db()->prepare('UPDATE game_attempts SET used_hint = 1 WHERE id = ?')->execute(array((int)$attempt['id']));
+    ok(array('cell' => $cell, 'value' => (int)$answers[$level - 1][$cell], 'usedHint' => true));
+}
+
 /** POST game/start：开始一次服务端尝试，返回幂等 attempt_key */
 function game_start() {
     $c = current_user();
@@ -103,7 +121,7 @@ function difficulty_exp($level) {
 
 /** 用户统计（勋章判定依据） */
 function user_stats($uid) {
-    $st = db()->prepare('SELECT COUNT(DISTINCT level) AS cc, COUNT(*) AS attempts, COALESCE(SUM(seconds),0) AS ts, COALESCE(AVG(seconds),0) AS av, COALESCE(MIN(seconds),0) AS bm, COALESCE(MAX(level),0) AS ml FROM game_records WHERE user_id = ?');
+    $st = db()->prepare('SELECT COUNT(DISTINCT level) AS cc, COUNT(*) AS attempts, COALESCE(SUM(seconds),0) AS ts, COALESCE(AVG(seconds),0) AS av, COALESCE(MIN(CASE WHEN used_hint = 0 THEN seconds END),0) AS bm, COALESCE(MAX(level),0) AS ml FROM game_records WHERE user_id = ?');
     $st->execute([(int)$uid]);
     $r = $st->fetch();
     return array(
@@ -166,7 +184,7 @@ function game_complete() {
     try {
         $pdo->beginTransaction();
 
-        $st = $pdo->prepare('SELECT id, started_at, completed_at FROM game_attempts WHERE user_id = ? AND level = ? AND attempt_key = ? FOR UPDATE');
+        $st = $pdo->prepare('SELECT id, started_at, completed_at, used_hint FROM game_attempts WHERE user_id = ? AND level = ? AND attempt_key = ? FOR UPDATE');
         $st->execute(array($uid, $level, $attemptKey));
         $lock = $st->fetch();
         if ($lock && $lock['completed_at']) {
@@ -192,11 +210,12 @@ function game_complete() {
         $seconds = min(100000, max($seconds, (int)$elapsedRow['elapsed']));
 
         // 该关历史（首次 / 最佳判定）
-        $st = $pdo->prepare('SELECT COUNT(*) AS cnt, COALESCE(MIN(seconds),0) AS best FROM game_records WHERE user_id = ? AND level = ?');
+        $st = $pdo->prepare('SELECT COUNT(*) AS cnt, SUM(used_hint = 0) AS valid_cnt, COALESCE(MIN(CASE WHEN used_hint = 0 THEN seconds END),0) AS best FROM game_records WHERE user_id = ? AND level = ?');
         $st->execute(array($uid, $level));
         $rec = $st->fetch();
         $first    = ((int)$rec['cnt'] === 0);
-        $isRecord = $first || $seconds < (int)$rec['best'];
+        $usedHint = (int)$lock['used_hint'] === 1;
+        $isRecord = !$usedHint && ((int)$rec['valid_cnt'] === 0 || $seconds < (int)$rec['best']);
 
         // 经验：基础 + 首次×1.5 + 刷新最佳+20
         $base = difficulty_exp($level);
@@ -205,9 +224,9 @@ function game_complete() {
         if ($isRecord) $expGain += 20;
 
         // 记录通关
-        $pdo->prepare('INSERT INTO game_records (user_id, level, seconds, is_record) VALUES (?,?,?,?)')
-            ->execute(array($uid, $level, $seconds, $isRecord ? 1 : 0));
-        $st = $pdo->prepare('SELECT MIN(seconds) AS best_seconds FROM game_records WHERE user_id = ? AND level = ?');
+        $pdo->prepare('INSERT INTO game_records (user_id, level, seconds, is_record, used_hint) VALUES (?,?,?,?,?)')
+            ->execute(array($uid, $level, $seconds, $isRecord ? 1 : 0, $usedHint ? 1 : 0));
+        $st = $pdo->prepare('SELECT MIN(seconds) AS best_seconds FROM game_records WHERE user_id = ? AND level = ? AND used_hint = 0');
         $st->execute(array($uid, $level));
         $bestRow = $st->fetch();
 
@@ -249,6 +268,7 @@ function game_complete() {
             'levelExp' => level_exp_into($newExp, $newLevel),
             'expNext'  => exp_needed($newLevel),
             'isRecord' => $isRecord,
+            'usedHint' => $usedHint,
             'first'    => $first,
             'newAchievements' => $newAch,
             'seconds' => $seconds,
@@ -298,7 +318,7 @@ function achievements_list() {
 function me_stats() {
     $c = current_user();
     $stats = user_stats($c['uid']);
-    $st = db()->prepare('SELECT level, MIN(seconds) AS best FROM game_records WHERE user_id = ? GROUP BY level ORDER BY level');
+    $st = db()->prepare('SELECT level, MIN(seconds) AS best FROM game_records WHERE user_id = ? AND used_hint = 0 GROUP BY level ORDER BY level');
     $st->execute([$c['uid']]);
     $bestByLevel = array();
     foreach ($st->fetchAll() as $r) $bestByLevel[(int)$r['level']] = (int)$r['best'];
@@ -330,7 +350,7 @@ function leaderboard() {
     $periodSql = '';
     if ($period === 'week') $periodSql = ' AND played_at >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)';
     elseif ($period === 'month') $periodSql = ' AND played_at >= DATE_FORMAT(CURDATE(), "%Y-%m-01")';
-    $bestSql = 'SELECT user_id, MIN(seconds) AS best FROM game_records WHERE level = ?' . $periodSql . ' GROUP BY user_id';
+    $bestSql = 'SELECT user_id, MIN(seconds) AS best FROM game_records WHERE level = ? AND used_hint = 0' . $periodSql . ' GROUP BY user_id';
     $st = $pdo->prepare(
         'SELECT u.id, u.username, u.nickname, u.avatar, b.best'
         . ' FROM (' . $bestSql . ') b JOIN users u ON u.id = b.user_id'

@@ -473,9 +473,20 @@
   };
   $('erase').onclick = erase;
   $('notes').onclick = () => { noteMode = !noteMode; $('notes').classList.toggle('active', noteMode); say(noteMode ? '笔记模式已开启' : '笔记模式已关闭'); };
-  $('hint').onclick = () => {
+  $('hint').onclick = async () => {
     if (dailyMode) { say('每日挑战不提供答案提示，请依据行、列和宫自行推理'); return; }
-    say('普通关卡答案由服务器校验，请填满棋盘后提交');
+    if (selected < 0 || given[selected]) { say('先选中一个空格'); return; }
+    if (quickMode) {
+      board[selected] = solution[selected]; notes[selected].clear();
+      sfx('hint'); saveGame(); render(); say('已填入一个正确数字'); return;
+    }
+    if (!currentUser) { say('请登录后使用提示'); openAuth('login'); return; }
+    try {
+      const key = await ensureAttemptStarted();
+      const d = await apiCall('game/hint', 'POST', { level, attempt_key: key, cell: selected });
+      board[selected] = d.value; notes[selected].clear();
+      sfx('hint'); saveGame(); render(); say('已填入一个正确数字，本局不计入排行榜');
+    } catch (e) { say('提示失败：' + (e.message || '请检查网络')); }
   };
   $('continue').onclick = () => loadLevel(level);
   $('daily-btn').onclick = () => loadDaily();

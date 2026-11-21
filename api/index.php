@@ -65,6 +65,11 @@ try {
         if (!rate_limit_check('game_start', 'uid:' . (int)$rateUser['uid'], 30, 60)) fail('开新局频率过高', 429);
         return game_start();
     }
+    if ($method === 'POST' && $r === 'game/hint') {
+        $rateUser = current_user();
+        if (!rate_limit_check('game_hint', 'uid:' . (int)$rateUser['uid'], 30, 60)) fail('提示请求过于频繁', 429);
+        return game_hint();
+    }
     if ($method === 'POST' && $r === 'daily/start') {
         $rateUser = current_user();
         if (!rate_limit_check('daily_start', 'uid:' . (int)$rateUser['uid'], 30, 3600)) fail('每日挑战开局频率过高', 429);

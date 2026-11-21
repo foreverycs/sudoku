@@ -125,3 +125,16 @@ test('quick games complete locally instead of using ranked server validation', (
   assert.match(enter, /if \(quickMode\) win\(\)/);
   assert.match(enter, /else if \(currentUser\) settleComplete\(seconds\)/);
 });
+
+test('hints use the server for ranked games, keep quick hints local, and exclude hinted records', () => {
+  const hint = read('api/handlers/game.php');
+  assert.match(hint, /function game_hint\(\)/);
+  assert.match(hint, /UPDATE game_attempts SET used_hint = 1/);
+  assert.match(read('api/index.php'), /game_hint/);
+  assert.match(hint, /used_hint = 0/);
+  assert.match(read('api/schema.sql'), /used_hint\s+TINYINT/);
+  assert.match(js, /if \(quickMode\) \{/);
+  assert.match(js, /apiCall\('game\/hint'/);
+  const daily = js.slice(js.indexOf("if (dailyMode) { say('每日挑战不提供答案提示"), js.indexOf("$('continue')"));
+  assert.match(daily, /每日挑战不提供答案提示/);
+});

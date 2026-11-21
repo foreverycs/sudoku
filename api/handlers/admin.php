@@ -120,13 +120,13 @@ function admin_user_detail($id) {
     $st->execute([$id]);
     $u = $st->fetch();
     if (!$u) fail('用户不存在', 404);
-    $st = $pdo->prepare('SELECT COUNT(*) AS c, COALESCE(SUM(seconds),0) AS ts, COALESCE(MIN(seconds),0) AS bm FROM game_records WHERE user_id = ?');
+    $st = $pdo->prepare('SELECT COUNT(*) AS c, COALESCE(SUM(seconds),0) AS ts, COALESCE(MIN(CASE WHEN used_hint = 0 THEN seconds END),0) AS bm FROM game_records WHERE user_id = ?');
     $st->execute([$id]);
     $stats = $st->fetch();
     $st = $pdo->prepare('SELECT a.code, a.name, a.icon, a.points, ua.unlocked_at FROM user_achievements ua JOIN achievements a ON a.id = ua.achievement_id WHERE ua.user_id = ? ORDER BY ua.unlocked_at DESC');
     $st->execute([$id]);
     $ach = $st->fetchAll();
-    $st = $pdo->prepare('SELECT level, MIN(seconds) AS best FROM game_records WHERE user_id = ? GROUP BY level ORDER BY level LIMIT 10');
+    $st = $pdo->prepare('SELECT level, MIN(seconds) AS best FROM game_records WHERE user_id = ? AND used_hint = 0 GROUP BY level ORDER BY level LIMIT 10');
     $st->execute([$id]);
     $best = $st->fetchAll();
     ok(array(

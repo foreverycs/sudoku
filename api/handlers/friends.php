@@ -119,7 +119,7 @@ function leaderboard_friends() {
     $marks = implode(',', array_fill(0, count($ids), '?'));
     $st = $pdo->prepare(
         'SELECT u.id, u.username, u.nickname, u.avatar, MIN(gr.seconds) AS best'
-        . ' FROM users u LEFT JOIN game_records gr ON gr.user_id = u.id AND gr.level = ?'
+        . ' FROM users u LEFT JOIN game_records gr ON gr.user_id = u.id AND gr.level = ? AND gr.used_hint = 0'
         . ($period === 'week' ? ' AND gr.played_at >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)' : '')
         . ($period === 'month' ? ' AND gr.played_at >= DATE_FORMAT(CURDATE(), "%Y-%m-01")' : '')
         . ' WHERE u.role = "user" AND u.status = 1 AND u.id IN (' . $marks . ')'
